@@ -35,14 +35,27 @@ export default function Login() {
 
     try {
       const response = await adminAuthAPI.login(form);
-      const payload = response.data?.data || response.data;
-      const token = payload?.token;
-      const user = payload?.user;
+      console.log('📦 Login response:', response.data);
+
+      // Backend returns FLAT: { success: true, token, user }
+      // Some endpoints may wrap it: { success: true, data: { token, user } }
+      // Handle both shapes.
+      const token =
+        response.data?.token ??
+        response.data?.data?.token;
+
+      const user =
+        response.data?.user ??
+        response.data?.data?.user;
+
+      console.log('🔑 Token present:', !!token);
+      console.log('👤 User:', user);
 
       if (!token || !user) {
-        setError('Invalid response from server.');
+        setError('Invalid response from server. Missing token or user.');
         return;
       }
+
       if (user.user_type !== 'admin') {
         setError('This account does not have admin access.');
         return;
@@ -50,8 +63,13 @@ export default function Login() {
 
       localStorage.setItem('admin_token', token);
       localStorage.setItem('admin_user', JSON.stringify(user));
+
+      console.log('✅ Stored admin_token:', token.slice(0, 30) + '...');
+      console.log('✅ Stored admin_user:', user.full_name, '| role:', user.user_type);
+
       navigate('/', { replace: true });
     } catch (err) {
+      console.error('Login error:', err);
       setError(
         err.response?.data?.error ||
           err.response?.data?.message ||
@@ -82,20 +100,13 @@ export default function Login() {
           py: { xs: 4, sm: 5 },
           backgroundColor: Colors.surface,
           border: `1px solid ${Colors.border}`,
-          borderRadius: 3,           // 12px — proportional to the card
+          borderRadius: 3,
           boxShadow: Colors.shadow.lg,
           display: 'flex',
           flexDirection: 'column',
         }}
       >
-        {/* Icon */}
-        <Box
-          sx={{
-            display: 'flex',
-            justifyContent: 'center',
-            mb: 2,
-          }}
-        >
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
           <Avatar
             sx={{
               bgcolor: Colors.primary,
@@ -108,7 +119,6 @@ export default function Login() {
           </Avatar>
         </Box>
 
-        {/* Header */}
         <Typography
           variant="h6"
           sx={{ fontWeight: 700, textAlign: 'center', color: Colors.textPrimary }}
@@ -124,14 +134,12 @@ export default function Login() {
 
         <Divider sx={{ mb: 3 }} />
 
-        {/* Error */}
         {error && (
           <Alert severity="error" sx={{ width: '100%', mb: 2, borderRadius: 2 }}>
             {error}
           </Alert>
         )}
 
-        {/* Form */}
         <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
           <TextField
             fullWidth
@@ -197,11 +205,7 @@ export default function Login() {
 
         <Typography
           variant="caption"
-          sx={{
-            color: Colors.textLight,
-            textAlign: 'center',
-            mt: 3,
-          }}
+          sx={{ color: Colors.textLight, textAlign: 'center', mt: 3 }}
         >
           Authorized personnel only
         </Typography>
