@@ -1,9 +1,12 @@
 // 📁 admin-web/src/App.jsx
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+
+import theme from './theme';
 import Layout from './components/Layout/Layout';
+
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import LiveDashboard from './pages/LiveDashboard';
@@ -22,64 +25,37 @@ import Notifications from './pages/Notifications';
 import Trash from './pages/Trash';
 
 // ============================================
-// MATERIAL UI THEME
-// ============================================
-const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#FF6B00',
-      light: '#FF8C33',
-      dark: '#CC5500',
-    },
-    secondary: {
-      main: '#1A1A1A',
-    },
-    success: {
-      main: '#4CAF50',
-    },
-    warning: {
-      main: '#FF9800',
-    },
-    error: {
-      main: '#D32F2F',
-    },
-  },
-  typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-  },
-  shape: {
-    borderRadius: 12,
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-          fontWeight: 600,
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-        },
-      },
-    },
-  },
-});
-
-// ============================================
 // PRIVATE ROUTE GUARD
 // ============================================
-function PrivateRoute({ children }) {
+// Requires:
+//   1. admin_token in localStorage
+//   2. admin_user present with user_type === 'admin'
+// If either is missing, redirect to /login.
+// ============================================
+function RequireAdmin() {
   const token = localStorage.getItem('admin_token');
-  
-  if (!token) {
+  const rawUser = localStorage.getItem('admin_user');
+
+  if (!token || !rawUser) {
     return <Navigate to="/login" replace />;
   }
-  
-  return children;
+
+  let user;
+  try {
+    user = JSON.parse(rawUser);
+  } catch {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!user || user.user_type !== 'admin') {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('admin_user');
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
 }
 
 // ============================================
@@ -88,7 +64,7 @@ function PrivateRoute({ children }) {
 function App() {
   return (
     <ThemeProvider theme={theme}>
-      {/* ✅ FIX: Added future flags to eliminate React Router warnings */}
+      <CssBaseline />
       <BrowserRouter
         future={{
           v7_startTransition: true,
@@ -96,176 +72,31 @@ function App() {
         }}
       >
         <Routes>
-          {/* Public Routes */}
+          {/* Public */}
           <Route path="/login" element={<Login />} />
-          
-          {/* Protected Routes */}
-          <Route 
-            path="/" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/live" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <LiveDashboard />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/agents" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Agents />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/customers" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Customers />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/products" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Products />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/inventory" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Inventory />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/orders" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Orders />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/withdrawals" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Withdrawals />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/promotions" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Promotions />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/reports" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Reports />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/analytics" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Analytics />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/notifications" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Notifications />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/support" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Support />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/trash" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Trash />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
-          
-          <Route 
-            path="/settings" 
-            element={
-              <PrivateRoute>
-                <Layout>
-                  <Settings />
-                </Layout>
-              </PrivateRoute>
-            } 
-          />
 
-          {/* Catch-all route - redirect to dashboard */}
+          {/* Protected — all wrapped by RequireAdmin + Layout */}
+          <Route element={<RequireAdmin />}>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/live" element={<LiveDashboard />} />
+              <Route path="/agents" element={<Agents />} />
+              <Route path="/customers" element={<Customers />} />
+              <Route path="/products" element={<Products />} />
+              <Route path="/inventory" element={<Inventory />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/withdrawals" element={<Withdrawals />} />
+              <Route path="/promotions" element={<Promotions />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/support" element={<Support />} />
+              <Route path="/trash" element={<Trash />} />
+              <Route path="/settings" element={<Settings />} />
+            </Route>
+          </Route>
+
+          {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

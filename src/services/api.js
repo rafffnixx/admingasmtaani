@@ -5,9 +5,6 @@ import axios from 'axios';
 // ============================================
 // API CONFIGURATION
 // ============================================
-// Defaults to the hosted Render backend.
-// Override in .env with VITE_API_URL if you ever need to point elsewhere
-// (e.g. a staging server or a local backend).
 const API_URL =
   import.meta.env.VITE_API_URL ||
   'https://gas-mtaani-backend.onrender.com/api';
@@ -16,7 +13,6 @@ const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
-    'x-admin-key': 'adminsecretkey_123',
   },
 });
 
@@ -43,23 +39,38 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('admin_token');
       localStorage.removeItem('admin_user');
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
 );
 
 // ============================================
-// AUTH API
+// ADMIN AUTH API
 // ============================================
-export const authAPI = {
-  login: (data) => api.post('/auth/login', data),
-  register: (data) => api.post('/auth/register', data),
+// The admin panel uses its own login route that:
+//   - only accepts users with user_type = 'admin'
+//   - returns a JWT with scope = 'admin'
+// ============================================
+export const adminAuthAPI = {
+  login: (data) => api.post('/admin/auth/login', data),
+  me: () => api.get('/admin/auth/me'),
   logout: () => {
     localStorage.removeItem('admin_token');
     localStorage.removeItem('admin_user');
     window.location.href = '/login';
   },
+};
+
+// Keep this for backward compatibility, but the admin panel should NOT use it.
+// The mobile/customer login returns a token with userType=agent/customer,
+// which the /api/admin/* routes reject with 403.
+export const authAPI = {
+  login: (data) => api.post('/auth/login', data),
+  register: (data) => api.post('/auth/register', data),
+  logout: adminAuthAPI.logout,
   getCurrentUser: () => api.get('/auth/me'),
 };
 
@@ -67,17 +78,13 @@ export const authAPI = {
 // ADMIN API
 // ============================================
 export const adminAPI = {
-  // ------------------------------------------
   // DASHBOARD
-  // ------------------------------------------
   getDashboard: () => api.get('/admin/dashboard'),
   getDashboardStats: () => api.get('/admin/dashboard/stats'),
   getRevenueData: () => api.get('/admin/dashboard/revenue'),
   getRecentOrders: () => api.get('/admin/dashboard/recent-orders'),
 
-  // ------------------------------------------
   // CUSTOMERS
-  // ------------------------------------------
   getCustomers: () => api.get('/admin/customers'),
   getCustomerDetails: (id) => api.get(`/admin/customers/${id}`),
   updateCustomer: (id, data) => api.put(`/admin/customers/${id}`, data),
@@ -87,7 +94,6 @@ export const adminAPI = {
   exportCustomers: () =>
     api.get('/admin/exports/customers', { responseType: 'blob' }),
 
-  // customer profile data
   getCustomerOrders: (customerId) =>
     api.get(`/admin/customers/${customerId}/orders`),
   getCustomerPayments: (customerId) =>
@@ -97,9 +103,7 @@ export const adminAPI = {
   getCustomerTickets: (customerId) =>
     api.get(`/admin/customers/${customerId}/tickets`),
 
-  // ------------------------------------------
   // AGENTS
-  // ------------------------------------------
   getAgents: () => api.get('/admin/agents'),
   getPendingAgents: () => api.get('/admin/agents/pending'),
   getAgentDetails: (id) => api.get(`/admin/agents/${id}`),
@@ -109,15 +113,12 @@ export const adminAPI = {
   unbanAgent: (id) => api.put(`/admin/agents/${id}/unban`),
   getAgentsList: () => api.get('/admin/agents/list'),
 
-  // agent profile data
   getAgentOrders: (agentId) => api.get(`/admin/agents/${agentId}/orders`),
   getAgentPayments: (agentId) => api.get(`/admin/agents/${agentId}/payments`),
   getAgentChats: (agentId) => api.get(`/admin/agents/${agentId}/chats`),
   getAgentTickets: (agentId) => api.get(`/admin/agents/${agentId}/tickets`),
 
-  // ------------------------------------------
   // PRODUCTS
-  // ------------------------------------------
   getProducts: () => api.get('/admin/products'),
   getProductDetails: (id) => api.get(`/admin/products/${id}`),
   createProduct: (data) => api.post('/admin/products', data),
@@ -129,9 +130,7 @@ export const adminAPI = {
     api.get(`/admin/products/${id}/price-history`),
   getProductsList: () => api.get('/admin/products/list'),
 
-  // ------------------------------------------
   // ORDERS
-  // ------------------------------------------
   getOrders: () => api.get('/admin/orders'),
   getOrderDetails: (id) => api.get(`/admin/orders/${id}`),
   updateOrderStatus: (id, status) =>
@@ -145,9 +144,7 @@ export const adminAPI = {
     api.put('/admin/orders/bulk-status', { orderIds, status }),
   createOrderForCustomer: (data) => api.post('/admin/orders/create', data),
 
-  // ------------------------------------------
   // INVENTORY
-  // ------------------------------------------
   getInventory: () => api.get('/admin/inventory'),
   getInventoryItem: (id) => api.get(`/admin/inventory/${id}`),
   createInventory: (data) => api.post('/admin/inventory', data),
@@ -158,9 +155,7 @@ export const adminAPI = {
   getInventoryByProduct: (productId) =>
     api.get(`/admin/inventory/product/${productId}`),
 
-  // ------------------------------------------
   // WITHDRAWALS
-  // ------------------------------------------
   getWithdrawals: () => api.get('/admin/withdrawals'),
   getPendingWithdrawals: () => api.get('/admin/withdrawals/pending'),
   processWithdrawal: (id, status) =>
@@ -170,9 +165,7 @@ export const adminAPI = {
   markWithdrawalAsPaid: (id) =>
     api.put(`/admin/withdrawals/${id}/mark-paid`),
 
-  // ------------------------------------------
   // ANALYTICS
-  // ------------------------------------------
   getAnalytics: () => api.get('/admin/analytics'),
   getRevenueAnalytics: (period) =>
     api.get(`/admin/analytics/revenue?period=${period}`),
@@ -180,9 +173,7 @@ export const adminAPI = {
   getAgentPerformance: () => api.get('/admin/analytics/agents'),
   getCustomerInsights: () => api.get('/admin/analytics/customers'),
 
-  // ------------------------------------------
   // SETTINGS
-  // ------------------------------------------
   getSettings: () => api.get('/admin/settings'),
   getSettingsByGroup: (group) => api.get(`/admin/settings/${group}`),
   getSettingByKey: (key) => api.get(`/admin/settings/${key}`),
@@ -190,9 +181,7 @@ export const adminAPI = {
   updateSetting: (key, data) => api.put(`/admin/settings/${key}`, data),
   resetSettings: () => api.post('/admin/settings/reset'),
 
-  // ------------------------------------------
   // EXPORTS
-  // ------------------------------------------
   exportOrders: () =>
     api.get('/admin/exports/orders', { responseType: 'blob' }),
   exportCustomers: () =>
@@ -204,9 +193,7 @@ export const adminAPI = {
   exportWithdrawals: () =>
     api.get('/admin/exports/withdrawals', { responseType: 'blob' }),
 
-  // ------------------------------------------
   // SUPPORT
-  // ------------------------------------------
   getSupportTickets: () => api.get('/admin/support/tickets'),
   getSupportTicketDetails: (id) =>
     api.get(`/admin/support/tickets/${id}`),
@@ -217,26 +204,20 @@ export const adminAPI = {
   deleteSupportTicket: (id) =>
     api.delete(`/admin/support/tickets/${id}`),
 
-  // ------------------------------------------
   // NOTIFICATIONS
-  // ------------------------------------------
   getNotifications: () => api.get('/admin/notifications'),
   sendNotification: (data) => api.post('/admin/notifications', data),
   deleteNotification: (id) => api.delete(`/admin/notifications/${id}`),
   markNotificationAsRead: (id) =>
     api.put(`/admin/notifications/${id}/read`),
 
-  // ------------------------------------------
   // PUSH NOTIFICATIONS
-  // ------------------------------------------
   getPushNotifications: () => api.get('/admin/push-notifications'),
   sendPushNotification: (data) => api.post('/admin/push-notifications', data),
   markPushNotificationAsRead: (id) =>
     api.put(`/admin/push-notifications/${id}/read`),
 
-  // ------------------------------------------
   // BULK ACTIONS
-  // ------------------------------------------
   bulkUpdateOrders: (orderIds, action) =>
     api.post('/admin/orders/bulk', { orderIds, action }),
   bulkDeleteProducts: (productIds) =>

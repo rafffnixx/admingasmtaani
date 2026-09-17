@@ -3,24 +3,29 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Container,
   Box,
+  Paper,
   Typography,
   TextField,
   Button,
-  Paper,
   Alert,
   Avatar,
   CircularProgress,
+  InputAdornment,
+  IconButton,
+  Divider,
 } from '@mui/material';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import { authAPI } from '../services/api';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import { adminAuthAPI } from '../services/api';
 import { Colors } from '../utils/colors';
 
 export default function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ phone_number: '', password: '' });
 
   const handleSubmit = async (e) => {
@@ -29,19 +34,15 @@ export default function Login() {
     setError('');
 
     try {
-      const response = await authAPI.login(form);
-
-      // Backend returns: { success: true, data: { token, user } }
-      // Some responses may also be flat: { success: true, token, user }
+      const response = await adminAuthAPI.login(form);
       const payload = response.data?.data || response.data;
       const token = payload?.token;
       const user = payload?.user;
 
       if (!token || !user) {
-        setError('Invalid response from server. Missing token or user.');
+        setError('Invalid response from server.');
         return;
       }
-
       if (user.user_type !== 'admin') {
         setError('This account does not have admin access.');
         return;
@@ -49,11 +50,8 @@ export default function Login() {
 
       localStorage.setItem('admin_token', token);
       localStorage.setItem('admin_user', JSON.stringify(user));
-
-      console.log('Logged in as:', user);
-      navigate('/');
+      navigate('/', { replace: true });
     } catch (err) {
-      console.error('Login error:', err);
       setError(
         err.response?.data?.error ||
           err.response?.data?.message ||
@@ -71,68 +69,143 @@ export default function Login() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        bgcolor: Colors.gray[50],
+        p: 2,
+        background: `linear-gradient(135deg, ${Colors.gray[100]} 0%, ${Colors.gray[200]} 100%)`,
       }}
     >
-      <Container maxWidth="xs">
-        <Paper
-          elevation={3}
-          sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+      <Paper
+        elevation={0}
+        sx={{
+          width: '100%',
+          maxWidth: 400,
+          px: { xs: 3, sm: 4 },
+          py: { xs: 4, sm: 5 },
+          backgroundColor: Colors.surface,
+          border: `1px solid ${Colors.border}`,
+          borderRadius: 3,           // 12px — proportional to the card
+          boxShadow: Colors.shadow.lg,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Icon */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            mb: 2,
+          }}
         >
-          <Avatar sx={{ bgcolor: Colors.primary, width: 56, height: 56, mb: 2 }}>
-            <LockOutlinedIcon sx={{ fontSize: 32 }} />
+          <Avatar
+            sx={{
+              bgcolor: Colors.primary,
+              width: 60,
+              height: 60,
+              boxShadow: `0 6px 16px ${Colors.primary}40`,
+            }}
+          >
+            <LockOutlinedIcon sx={{ fontSize: 30 }} />
           </Avatar>
-          <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-            Gas Mtaani Admin
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Manage your gas delivery business
-          </Typography>
+        </Box>
 
-          {error && (
-            <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+        {/* Header */}
+        <Typography
+          variant="h6"
+          sx={{ fontWeight: 700, textAlign: 'center', color: Colors.textPrimary }}
+        >
+          Gas Mtaani Admin
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{ color: Colors.textSecondary, textAlign: 'center', mt: 0.5, mb: 3 }}
+        >
+          Sign in to manage the platform
+        </Typography>
 
-          <form onSubmit={handleSubmit} style={{ width: '100%' }}>
-            <TextField
-              fullWidth
-              margin="normal"
-              required
-              label="Phone Number"
-              name="phone_number"
-              value={form.phone_number}
-              onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
-              autoFocus
-            />
-            <TextField
-              fullWidth
-              margin="normal"
-              required
-              label="Password"
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-            />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              disabled={loading}
-              sx={{
-                mt: 3,
-                bgcolor: Colors.primary,
-                '&:hover': { bgcolor: Colors.primaryDark },
-                height: 48,
-              }}
-            >
-              {loading ? <CircularProgress size={24} color="inherit" /> : 'Login'}
-            </Button>
-          </form>
-        </Paper>
-      </Container>
+        <Divider sx={{ mb: 3 }} />
+
+        {/* Error */}
+        {error && (
+          <Alert severity="error" sx={{ width: '100%', mb: 2, borderRadius: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Form */}
+        <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
+          <TextField
+            fullWidth
+            required
+            autoFocus
+            size="medium"
+            label="Phone Number"
+            name="phone_number"
+            value={form.phone_number}
+            onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
+            autoComplete="off"
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            fullWidth
+            required
+            size="medium"
+            label="Password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            autoComplete="off"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <Button
+            type="submit"
+            fullWidth
+            size="large"
+            variant="contained"
+            disabled={loading}
+            sx={{
+              mt: 3,
+              height: 48,
+              borderRadius: 2,
+              bgcolor: Colors.primary,
+              color: Colors.white,
+              fontWeight: 700,
+              boxShadow: `0 4px 12px ${Colors.primary}40`,
+              '&:hover': {
+                bgcolor: Colors.primaryDark,
+                boxShadow: `0 6px 16px ${Colors.primary}55`,
+              },
+            }}
+          >
+            {loading ? <CircularProgress size={22} color="inherit" /> : 'Sign in'}
+          </Button>
+        </Box>
+
+        <Typography
+          variant="caption"
+          sx={{
+            color: Colors.textLight,
+            textAlign: 'center',
+            mt: 3,
+          }}
+        >
+          Authorized personnel only
+        </Typography>
+      </Paper>
     </Box>
   );
 }
