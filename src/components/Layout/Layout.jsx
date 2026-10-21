@@ -17,15 +17,18 @@ import {
   SupportAgent as SupportIcon,
   Logout as LogoutIcon,
   Menu as MenuIcon,
-  Map as MapIcon,                    // ← NEW
+  Map as MapIcon,
+  PhoneInTalk as PhoneIcon,          // ← NEW
 } from '@mui/icons-material';
 import { Colors } from '../../utils/colors';
+import AdminCallListener from '../AdminCallListener';
 
 const DRAWER_WIDTH = 240;
 
 const nav = [
   { label: 'Dashboard', path: '/', icon: <DashboardIcon /> },
-  { label: 'Live Tracking', path: '/live-tracking', icon: <MapIcon /> },  // ← NEW
+  { label: 'Incoming Calls', path: '/incoming-calls', icon: <PhoneIcon /> },  // ← NEW
+  { label: 'Live Tracking', path: '/live-tracking', icon: <MapIcon /> },
   { label: 'Customers', path: '/customers', icon: <PeopleIcon /> },
   { label: 'Agents', path: '/agents', icon: <StoreIcon /> },
   { label: 'Products', path: '/products', icon: <ProductIcon /> },
@@ -161,6 +164,8 @@ export default function Layout() {
       >
         <Outlet />
       </Box>
+
+      <AdminCallListener />
     </Box>
   );
 }

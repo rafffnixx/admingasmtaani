@@ -23,7 +23,8 @@ import Promotions from './pages/Promotions';
 import Support from './pages/Support';
 import Notifications from './pages/Notifications';
 import Trash from './pages/Trash';
-import LiveTracking from './pages/LiveTracking';   // ← NEW
+import LiveTracking from './pages/LiveTracking';
+import IncomingCalls from './pages/IncomingCalls';   // ← NEW
 
 function RequireAdmin() {
   const token = localStorage.getItem('admin_token');
@@ -60,8 +61,9 @@ function App() {
           <Route element={<RequireAdmin />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/incoming-calls" element={<IncomingCalls />} />   {/* ← NEW */}
               <Route path="/live" element={<LiveDashboard />} />
-              <Route path="/live-tracking" element={<LiveTracking />} />   {/* ← NEW */}
+              <Route path="/live-tracking" element={<LiveTracking />} />
               <Route path="/agents" element={<Agents />} />
               <Route path="/customers" element={<Customers />} />
               <Route path="/products" element={<Products />} />

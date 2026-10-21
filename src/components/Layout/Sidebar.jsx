@@ -1,3 +1,4 @@
+// 📁 admin-web/src/components/Sidebar.jsx
 import React from 'react';
 import { Drawer, List, ListItem, ListItemIcon, ListItemText, Toolbar, Typography, Box } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -16,6 +17,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LiveTvIcon from '@mui/icons-material/LiveTv';
 import MapIcon from '@mui/icons-material/Map';
+import PhoneIcon from '@mui/icons-material/PhoneInTalk';   // ← NEW
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Colors } from '../utils/colors';
 
@@ -27,6 +29,7 @@ export default function Sidebar() {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+    { text: 'Incoming Calls', icon: <PhoneIcon />, path: '/incoming-calls' },   // ← NEW
     { text: 'Live Dashboard', icon: <LiveTvIcon />, path: '/live' },
     { text: 'Live Tracking', icon: <MapIcon />, path: '/live-tracking' },
     { text: 'Agents', icon: <PeopleIcon />, path: '/agents' },

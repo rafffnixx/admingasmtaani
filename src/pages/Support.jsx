@@ -1,5 +1,5 @@
 // 📁 admin-web/src/pages/Support.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Chip, IconButton, Button, Dialog, DialogTitle, DialogContent, DialogActions, TextField,
@@ -8,9 +8,7 @@ import {
 } from '@mui/material';
 import {
   Refresh, Visibility, CheckCircle, Cancel, AccessTime, Person, Reply,
-  PhoneInTalk, CallEnd, Mic, MicOff,
 } from '@mui/icons-material';
-import AgoraRTC from 'agora-rtc-sdk-ng';
 import { Colors } from '../utils/colors';
 import { adminAPI } from '../services/api';
 
@@ -27,119 +25,9 @@ export default function Support() {
   const [replyMessage, setReplyMessage] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // ── Live Call State ──
-  const [pendingCalls, setPendingCalls] = useState([]);
-  const [activeCall, setActiveCall] = useState(null);
-  const [callConnected, setCallConnected] = useState(false);
-  const [micMuted, setMicMuted] = useState(false);
-  const agoraClientRef = useRef(null);
-  const localAudioTrackRef = useRef(null);
-  const pollRef = useRef(null);
-
   useEffect(() => {
     fetchTickets();
-    pollPendingCalls();
-
-    pollRef.current = setInterval(pollPendingCalls, 5000);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-      endCall();
-    };
   }, []);
-
-  // ── Fetch pending support calls (from Agora) ──
-  const pollPendingCalls = async () => {
-    try {
-      const res = await api.get('/admin/support-calls/pending');
-      setPendingCalls(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      // Silent — endpoint may not exist yet
-    }
-  };
-
-  // ── Answer call from browser ──
-  const answerCall = async (call) => {
-    try {
-      const appId = import.meta.env.VITE_AGORA_APP_ID;
-      if (!appId) {
-        showSnackbar('Agora App ID not configured', 'error');
-        return;
-      }
-
-      // 1. Call backend to get a token for this admin
-      const tokenRes = await api.post(`/admin/support-calls/${call.id}/answer`);
-      const { token, uid, channel_name } = tokenRes.data || {};
-
-      if (!token || !channel_name) {
-        showSnackbar('Backend did not return Agora token', 'error');
-        return;
-      }
-
-      // 2. Join the Agora channel
-      const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-      agoraClientRef.current = client;
-
-      await client.join(appId, channel_name, token, uid);
-
-      // 3. Publish microphone
-      const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-      localAudioTrackRef.current = audioTrack;
-      await client.publish([audioTrack]);
-
-      // 4. Play remote audio
-      client.on('user-published', async (user, mediaType) => {
-        if (mediaType === 'audio') {
-          await client.subscribe(user, mediaType);
-          user.audioTrack.play();
-        }
-      });
-
-      client.on('user-left', () => {
-        showSnackbar('Caller ended the call', 'info');
-        endCall();
-      });
-
-      setActiveCall({ ...call, channel_name });
-      setCallConnected(true);
-      showSnackbar('Connected — you can speak now');
-    } catch (err) {
-      console.error('Answer call error:', err);
-      showSnackbar(err?.response?.data?.error || err.message || 'Failed to answer call', 'error');
-    }
-  };
-
-  // ── End call ──
-  const endCall = async () => {
-    try {
-      if (localAudioTrackRef.current) {
-        localAudioTrackRef.current.stop();
-        localAudioTrackRef.current.close();
-        localAudioTrackRef.current = null;
-      }
-      if (agoraClientRef.current) {
-        await agoraClientRef.current.leave();
-        agoraClientRef.current = null;
-      }
-      if (activeCall?.id) {
-        await api.post(`/admin/support-calls/${activeCall.id}/end`).catch(() => {});
-      }
-    } catch (e) {
-      console.warn('End call error:', e.message);
-    } finally {
-      setActiveCall(null);
-      setCallConnected(false);
-      setMicMuted(false);
-      pollPendingCalls();
-    }
-  };
-
-  // ── Toggle mic ──
-  const toggleMic = async () => {
-    if (!localAudioTrackRef.current) return;
-    const next = !micMuted;
-    await localAudioTrackRef.current.setEnabled(!next);
-    setMicMuted(next);
-  };
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -218,6 +106,11 @@ export default function Support() {
     }
   };
 
+  const handleViewTicket = (ticket) => {
+    setSelectedTicket(ticket);
+    setOpenDialog(true);
+  };
+
   const getStatusChip = (status) => {
     const colors = { open: 'warning', in_progress: 'info', resolved: 'success', closed: 'default' };
     const labels = { open: 'Open', in_progress: 'In Progress', resolved: 'Resolved', closed: 'Closed' };
@@ -249,84 +142,8 @@ export default function Support() {
 
   return (
     <Box>
-      {/* ──────────────────────────────────────────────── */}
-      {/* LIVE INCOMING CALLS                            */}
-      {/* ──────────────────────────────────────────────── */}
-      {pendingCalls.length > 0 && !activeCall && (
-        <Paper sx={{ p: 2, mb: 3, bgcolor: '#FEF2F2', border: '2px solid #EF4444', borderRadius: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <PhoneInTalk sx={{ color: '#EF4444', fontSize: 32 }} />
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="h6" color="error" fontWeight="bold">
-                🔔 Incoming Support Call
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {pendingCalls[0].caller_name || 'Caller'} ({pendingCalls[0].caller_phone || 'N/A'}) is waiting
-              </Typography>
-            </Box>
-            <Button
-              variant="contained"
-              sx={{ bgcolor: '#22C55E', '&:hover': { bgcolor: '#16A34A' } }}
-              startIcon={<PhoneInTalk />}
-              onClick={() => answerCall(pendingCalls[0])}
-            >
-              Answer
-            </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={async () => {
-                await api.post(`/admin/support-calls/${pendingCalls[0].id}/end`).catch(() => {});
-                pollPendingCalls();
-              }}
-            >
-              Decline
-            </Button>
-          </Box>
-        </Paper>
-      )}
-
-      {activeCall && (
-        <Paper sx={{ p: 2, mb: 3, bgcolor: '#ECFDF5', border: '2px solid #22C55E', borderRadius: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <PhoneInTalk sx={{ color: '#22C55E', fontSize: 32 }} />
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="h6" color="success.main" fontWeight="bold">
-                {callConnected ? '🎙️ Call Connected' : 'Connecting…'}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {activeCall.caller_name || 'Caller'} — {activeCall.caller_phone || 'N/A'}
-              </Typography>
-            </Box>
-            <IconButton
-              onClick={toggleMic}
-              sx={{
-                bgcolor: micMuted ? '#EF4444' : '#22C55E',
-                color: '#FFF',
-                '&:hover': { bgcolor: micMuted ? '#DC2626' : '#16A34A' },
-              }}
-            >
-              {micMuted ? <MicOff /> : <Mic />}
-            </IconButton>
-            <Button
-              variant="contained"
-              color="error"
-              startIcon={<CallEnd />}
-              onClick={endCall}
-            >
-              End Call
-            </Button>
-          </Box>
-        </Paper>
-      )}
-
-      {/* ──────────────────────────────────────────────── */}
-      {/* EXISTING SUPPORT TICKETS UI                    */}
-      {/* ──────────────────────────────────────────────── */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
-          Support Tickets
-        </Typography>
+        <Typography variant="h4" sx={{ fontWeight: 'bold' }}>Support Tickets</Typography>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <TextField size="small" placeholder="Search tickets..." value={searchTerm} onChange={handleSearch} sx={{ width: 200 }} />
           <FormControl size="small" sx={{ minWidth: 130 }}>
@@ -346,21 +163,11 @@ export default function Support() {
       </Box>
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card><CardContent sx={{ textAlign: 'center' }}><Typography variant="h4" sx={{ color: Colors.primary }}>{stats.total}</Typography><Typography variant="body2" color="text.secondary">Total Tickets</Typography></CardContent></Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card sx={{ borderLeft: `4px solid ${Colors.warning}` }}><CardContent sx={{ textAlign: 'center' }}><Typography variant="h4" sx={{ color: Colors.warning }}>{stats.open}</Typography><Typography variant="body2" color="text.secondary">Open</Typography></CardContent></Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card sx={{ borderLeft: `4px solid ${Colors.info}` }}><CardContent sx={{ textAlign: 'center' }}><Typography variant="h4" sx={{ color: Colors.info }}>{stats.inProgress}</Typography><Typography variant="body2" color="text.secondary">In Progress</Typography></CardContent></Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card sx={{ borderLeft: `4px solid ${Colors.success}` }}><CardContent sx={{ textAlign: 'center' }}><Typography variant="h4" sx={{ color: Colors.success }}>{stats.resolved}</Typography><Typography variant="body2" color="text.secondary">Resolved</Typography></CardContent></Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={2.4}>
-          <Card sx={{ borderLeft: `4px solid ${Colors.gray[400]}` }}><CardContent sx={{ textAlign: 'center' }}><Typography variant="h4" sx={{ color: Colors.gray[600] }}>{stats.closed}</Typography><Typography variant="body2" color="text.secondary">Closed</Typography></CardContent></Card>
-        </Grid>
+        <Grid item xs={12} sm={6} md={2.4}><Card><CardContent sx={{ textAlign: 'center' }}><Typography variant="h4" sx={{ color: Colors.primary }}>{stats.total}</Typography><Typography variant="body2" color="text.secondary">Total Tickets</Typography></CardContent></Card></Grid>
+        <Grid item xs={12} sm={6} md={2.4}><Card sx={{ borderLeft: `4px solid ${Colors.warning}` }}><CardContent sx={{ textAlign: 'center' }}><Typography variant="h4" sx={{ color: Colors.warning }}>{stats.open}</Typography><Typography variant="body2" color="text.secondary">Open</Typography></CardContent></Card></Grid>
+        <Grid item xs={12} sm={6} md={2.4}><Card sx={{ borderLeft: `4px solid ${Colors.info}` }}><CardContent sx={{ textAlign: 'center' }}><Typography variant="h4" sx={{ color: Colors.info }}>{stats.inProgress}</Typography><Typography variant="body2" color="text.secondary">In Progress</Typography></CardContent></Card></Grid>
+        <Grid item xs={12} sm={6} md={2.4}><Card sx={{ borderLeft: `4px solid ${Colors.success}` }}><CardContent sx={{ textAlign: 'center' }}><Typography variant="h4" sx={{ color: Colors.success }}>{stats.resolved}</Typography><Typography variant="body2" color="text.secondary">Resolved</Typography></CardContent></Card></Grid>
+        <Grid item xs={12} sm={6} md={2.4}><Card sx={{ borderLeft: `4px solid ${Colors.gray[400]}` }}><CardContent sx={{ textAlign: 'center' }}><Typography variant="h4" sx={{ color: Colors.gray[600] }}>{stats.closed}</Typography><Typography variant="body2" color="text.secondary">Closed</Typography></CardContent></Card></Grid>
       </Grid>
 
       <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}>
@@ -399,36 +206,26 @@ export default function Support() {
                   <TableCell align="center">
                     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
                       <Tooltip title="View Details">
-                        <IconButton size="small" onClick={() => { setSelectedTicket(ticket); setOpenDialog(true); }}>
-                          <Visibility fontSize="small" />
-                        </IconButton>
+                        <IconButton size="small" onClick={() => handleViewTicket(ticket)}><Visibility fontSize="small" /></IconButton>
                       </Tooltip>
                       {ticket.status === 'open' && (
                         <Tooltip title="Mark In Progress">
-                          <IconButton size="small" color="info" onClick={() => handleUpdateStatus(ticket.id, 'in_progress')}>
-                            <AccessTime fontSize="small" />
-                          </IconButton>
+                          <IconButton size="small" color="info" onClick={() => handleUpdateStatus(ticket.id, 'in_progress')}><AccessTime fontSize="small" /></IconButton>
                         </Tooltip>
                       )}
                       {ticket.status === 'in_progress' && (
                         <Tooltip title="Mark Resolved">
-                          <IconButton size="small" color="success" onClick={() => handleUpdateStatus(ticket.id, 'resolved')}>
-                            <CheckCircle fontSize="small" />
-                          </IconButton>
+                          <IconButton size="small" color="success" onClick={() => handleUpdateStatus(ticket.id, 'resolved')}><CheckCircle fontSize="small" /></IconButton>
                         </Tooltip>
                       )}
                       {(ticket.status === 'open' || ticket.status === 'in_progress') && (
                         <Tooltip title="Reply">
-                          <IconButton size="small" color="primary" onClick={() => { setSelectedTicket(ticket); setOpenReplyDialog(true); }}>
-                            <Reply fontSize="small" />
-                          </IconButton>
+                          <IconButton size="small" color="primary" onClick={() => { setSelectedTicket(ticket); setOpenReplyDialog(true); }}><Reply fontSize="small" /></IconButton>
                         </Tooltip>
                       )}
                       {ticket.status === 'open' && (
                         <Tooltip title="Close">
-                          <IconButton size="small" color="error" onClick={() => handleUpdateStatus(ticket.id, 'closed')}>
-                            <Cancel fontSize="small" />
-                          </IconButton>
+                          <IconButton size="small" color="error" onClick={() => handleUpdateStatus(ticket.id, 'closed')}><Cancel fontSize="small" /></IconButton>
                         </Tooltip>
                       )}
                     </Box>
@@ -436,17 +233,12 @@ export default function Support() {
                 </TableRow>
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                  <Typography variant="body2" color="text.secondary">No tickets found</Typography>
-                </TableCell>
-              </TableRow>
+              <TableRow><TableCell colSpan={6} align="center" sx={{ py: 4 }}><Typography variant="body2" color="text.secondary">No tickets found</Typography></TableCell></TableRow>
             )}
           </TableBody>
         </Table>
       </TableContainer>
 
-      {/* View Ticket Dialog */}
       <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ bgcolor: Colors.primaryBg }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -495,7 +287,6 @@ export default function Support() {
         <DialogActions><Button onClick={() => setOpenDialog(false)}>Close</Button></DialogActions>
       </Dialog>
 
-      {/* Reply Dialog */}
       <Dialog open={openReplyDialog} onClose={() => setOpenReplyDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ bgcolor: Colors.primaryBg }}><Typography variant="h6">Reply to Ticket</Typography></DialogTitle>
         <DialogContent>
