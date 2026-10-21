@@ -23,22 +23,13 @@ import Promotions from './pages/Promotions';
 import Support from './pages/Support';
 import Notifications from './pages/Notifications';
 import Trash from './pages/Trash';
+import LiveTracking from './pages/LiveTracking';   // ← NEW
 
-// ============================================
-// PRIVATE ROUTE GUARD
-// ============================================
-// Requires:
-//   1. admin_token in localStorage
-//   2. admin_user present with user_type === 'admin'
-// If either is missing, redirect to /login.
-// ============================================
 function RequireAdmin() {
   const token = localStorage.getItem('admin_token');
   const rawUser = localStorage.getItem('admin_user');
 
-  if (!token || !rawUser) {
-    return <Navigate to="/login" replace />;
-  }
+  if (!token || !rawUser) return <Navigate to="/login" replace />;
 
   let user;
   try {
@@ -58,28 +49,19 @@ function RequireAdmin() {
   return <Outlet />;
 }
 
-// ============================================
-// MAIN APP
-// ============================================
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter
-        future={{
-          v7_startTransition: true,
-          v7_relativeSplatPath: true,
-        }}
-      >
+      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <Routes>
-          {/* Public */}
           <Route path="/login" element={<Login />} />
 
-          {/* Protected — all wrapped by RequireAdmin + Layout */}
           <Route element={<RequireAdmin />}>
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/live" element={<LiveDashboard />} />
+              <Route path="/live-tracking" element={<LiveTracking />} />   {/* ← NEW */}
               <Route path="/agents" element={<Agents />} />
               <Route path="/customers" element={<Customers />} />
               <Route path="/products" element={<Products />} />
@@ -96,7 +78,6 @@ function App() {
             </Route>
           </Route>
 
-          {/* Catch-all */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

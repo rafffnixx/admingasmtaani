@@ -2,20 +2,8 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
-  Box,
-  Drawer,
-  AppBar,
-  Toolbar,
-  Typography,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  IconButton,
-  Avatar,
-  Divider,
-  Menu,
-  MenuItem,
+  Box, Drawer, AppBar, Toolbar, Typography, List, ListItemButton,
+  ListItemIcon, ListItemText, IconButton, Avatar, Divider, Menu, MenuItem,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -29,6 +17,7 @@ import {
   SupportAgent as SupportIcon,
   Logout as LogoutIcon,
   Menu as MenuIcon,
+  Map as MapIcon,                    // ← NEW
 } from '@mui/icons-material';
 import { Colors } from '../../utils/colors';
 
@@ -36,6 +25,7 @@ const DRAWER_WIDTH = 240;
 
 const nav = [
   { label: 'Dashboard', path: '/', icon: <DashboardIcon /> },
+  { label: 'Live Tracking', path: '/live-tracking', icon: <MapIcon /> },  // ← NEW
   { label: 'Customers', path: '/customers', icon: <PeopleIcon /> },
   { label: 'Agents', path: '/agents', icon: <StoreIcon /> },
   { label: 'Products', path: '/products', icon: <ProductIcon /> },
@@ -69,19 +59,10 @@ export default function Layout() {
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Toolbar sx={{ gap: 1.5 }}>
-        <Avatar
-          sx={{
-            bgcolor: Colors.primary,
-            width: 36,
-            height: 36,
-            boxShadow: Colors.shadow.sm,
-          }}
-        >
+        <Avatar sx={{ bgcolor: Colors.primary, width: 36, height: 36, boxShadow: Colors.shadow.sm }}>
           G
         </Avatar>
-        <Typography variant="subtitle1" fontWeight={700}>
-          Gas Mtaani
-        </Typography>
+        <Typography variant="subtitle1" fontWeight={700}>Gas Mtaani</Typography>
       </Toolbar>
       <Divider />
       <List sx={{ flex: 1, py: 1 }}>
@@ -107,9 +88,7 @@ export default function Layout() {
       <Divider />
       <List>
         <ListItemButton onClick={handleLogout}>
-          <ListItemIcon sx={{ minWidth: 36 }}>
-            <LogoutIcon />
-          </ListItemIcon>
+          <ListItemIcon sx={{ minWidth: 36 }}><LogoutIcon /></ListItemIcon>
           <ListItemText primary="Logout" />
         </ListItemButton>
       </List>
@@ -120,15 +99,11 @@ export default function Layout() {
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: Colors.background }}>
       <AppBar
         position="fixed"
-        sx={{
-          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-          ml: { md: `${DRAWER_WIDTH}px` },
-        }}
+        sx={{ width: { md: `calc(100% - ${DRAWER_WIDTH}px)` }, ml: { md: `${DRAWER_WIDTH}px` } }}
       >
         <Toolbar>
           <IconButton
-            color="inherit"
-            edge="start"
+            color="inherit" edge="start"
             onClick={() => setMobileOpen(!mobileOpen)}
             sx={{ mr: 2, display: { md: 'none' } }}
           >
@@ -138,22 +113,11 @@ export default function Layout() {
             Admin Console
           </Typography>
           <IconButton onClick={(e) => setAnchorEl(e.currentTarget)}>
-            <Avatar
-              sx={{
-                bgcolor: Colors.primary,
-                width: 34,
-                height: 34,
-                fontSize: 14,
-              }}
-            >
+            <Avatar sx={{ bgcolor: Colors.primary, width: 34, height: 34, fontSize: 14 }}>
               {user.full_name?.charAt(0) || 'A'}
             </Avatar>
           </IconButton>
-          <Menu
-            anchorEl={anchorEl}
-            open={Boolean(anchorEl)}
-            onClose={() => setAnchorEl(null)}
-          >
+          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
             <MenuItem disabled>
               {user.full_name || 'Admin'} ({user.phone_number || ''})
             </MenuItem>
@@ -163,10 +127,7 @@ export default function Layout() {
         </Toolbar>
       </AppBar>
 
-      <Box
-        component="nav"
-        sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
-      >
+      <Box component="nav" sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}>
         <Drawer
           variant="temporary"
           open={mobileOpen}
@@ -194,10 +155,8 @@ export default function Layout() {
       <Box
         component="main"
         sx={{
-          flexGrow: 1,
-          p: { xs: 2, md: 3 },
-          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-          mt: 8,
+          flexGrow: 1, p: { xs: 2, md: 3 },
+          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` }, mt: 8,
         }}
       >
         <Outlet />
