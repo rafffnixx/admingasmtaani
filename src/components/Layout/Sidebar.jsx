@@ -15,6 +15,7 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LiveTvIcon from '@mui/icons-material/LiveTv';
+import MapIcon from '@mui/icons-material/Map';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Colors } from '../utils/colors';
 
@@ -27,6 +28,7 @@ export default function Sidebar() {
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
     { text: 'Live Dashboard', icon: <LiveTvIcon />, path: '/live' },
+    { text: 'Live Tracking', icon: <MapIcon />, path: '/live-tracking' },
     { text: 'Agents', icon: <PeopleIcon />, path: '/agents' },
     { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
     { text: 'Products', icon: <StoreIcon />, path: '/products' },
