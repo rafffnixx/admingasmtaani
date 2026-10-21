@@ -12,7 +12,7 @@ import {
 } from '@mui/icons-material';
 import AgoraRTC from 'agora-rtc-sdk-ng';
 import { Colors } from '../utils/colors';
-import { adminAPI, api } from '../services/api';
+import { adminAPI } from '../services/api';
 
 export default function Support() {
   const [loading, setLoading] = useState(true);

@@ -50,10 +50,6 @@ api.interceptors.response.use(
 // ============================================
 // ADMIN AUTH API
 // ============================================
-// The admin panel uses its own login route that:
-//   - only accepts users with user_type = 'admin'
-//   - returns a JWT with scope = 'admin'
-// ============================================
 export const adminAuthAPI = {
   login: (data) => api.post('/admin/auth/login', data),
   me: () => api.get('/admin/auth/me'),
@@ -64,9 +60,9 @@ export const adminAuthAPI = {
   },
 };
 
-// Keep this for backward compatibility, but the admin panel should NOT use it.
-// The mobile/customer login returns a token with userType=agent/customer,
-// which the /api/admin/* routes reject with 403.
+// ============================================
+// BACKWARD-COMPAT AUTH
+// ============================================
 export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   register: (data) => api.post('/auth/register', data),
@@ -144,6 +140,10 @@ export const adminAPI = {
     api.put('/admin/orders/bulk-status', { orderIds, status }),
   createOrderForCustomer: (data) => api.post('/admin/orders/create', data),
 
+  // LIVE TRACKING
+  getLiveTracking: () => api.get('/admin/orders/live-tracking'),
+  getAgentsLiveMap: () => api.get('/admin/agents/live-map'),
+
   // INVENTORY
   getInventory: () => api.get('/admin/inventory'),
   getInventoryItem: (id) => api.get(`/admin/inventory/${id}`),
@@ -193,7 +193,7 @@ export const adminAPI = {
   exportWithdrawals: () =>
     api.get('/admin/exports/withdrawals', { responseType: 'blob' }),
 
-  // SUPPORT
+  // SUPPORT TICKETS
   getSupportTickets: () => api.get('/admin/support/tickets'),
   getSupportTicketDetails: (id) =>
     api.get(`/admin/support/tickets/${id}`),
@@ -203,6 +203,13 @@ export const adminAPI = {
     api.post(`/admin/support/tickets/${id}/reply`, data),
   deleteSupportTicket: (id) =>
     api.delete(`/admin/support/tickets/${id}`),
+
+  // SUPPORT CALLS (Agora live audio)
+  getPendingSupportCalls: () => api.get('/admin/support-calls/pending'),
+  answerSupportCall: (callId) =>
+    api.post(`/admin/support-calls/${callId}/answer`),
+  endSupportCall: (callId) =>
+    api.post(`/admin/support-calls/${callId}/end`),
 
   // NOTIFICATIONS
   getNotifications: () => api.get('/admin/notifications'),
