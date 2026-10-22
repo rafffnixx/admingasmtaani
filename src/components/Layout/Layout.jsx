@@ -1,4 +1,4 @@
-// 📁 admin-web/src/components/Layout.jsx
+// 📁 admin-web/src/components/Layout/Layout.jsx
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import {
@@ -19,9 +19,9 @@ import {
   Menu as MenuIcon,
   Map as MapIcon,
   PhoneInTalk as PhoneIcon,
-  Storefront as MarketersIcon,        // ← NEW (re-uses Storefront)
+  Storefront as MarketersIcon,
 } from '@mui/icons-material';
-import { Colors } from '../utils/colors';
+import { Colors } from '../../utils/colors';
 import AdminCallListener from '../AdminCallListener';
 
 const DRAWER_WIDTH = 240;
@@ -37,7 +37,7 @@ const nav = [
   { label: 'Withdrawals', path: '/withdrawals', icon: <WithdrawIcon /> },
   { label: 'Analytics', path: '/analytics', icon: <AnalyticsIcon /> },
   { label: 'Support', path: '/support', icon: <SupportIcon /> },
-  { label: 'Marketers', path: '/marketers', icon: <MarketersIcon /> },   // ← NEW
+  { label: 'Marketers', path: '/marketers', icon: <MarketersIcon /> },
   { label: 'Settings', path: '/settings', icon: <SettingsIcon /> },
 ];
 
