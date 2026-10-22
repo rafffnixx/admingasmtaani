@@ -24,7 +24,17 @@ import Support from './pages/Support';
 import Notifications from './pages/Notifications';
 import Trash from './pages/Trash';
 import LiveTracking from './pages/LiveTracking';
-import IncomingCalls from './pages/IncomingCalls';   // ← NEW
+import IncomingCalls from './pages/IncomingCalls';
+import Marketers from './pages/Marketers';
+
+// Marketer sub-app
+import MarketerLogin from './pages-marketer/MarketerLogin';
+import MarketerLayout from './pages-marketer/MarketerLayout';
+import MarketerDashboard from './pages-marketer/MarketerDashboard';
+import MarketerRegistrations from './pages-marketer/MarketerRegistrations';
+import MarketerCommissions from './pages-marketer/MarketerCommissions';
+import MarketerWithdrawals from './pages-marketer/MarketerWithdrawals';
+import { MarketerAuthProvider } from './context/MarketerAuthContext';
 
 function RequireAdmin() {
   const token = localStorage.getItem('admin_token');
@@ -50,39 +60,63 @@ function RequireAdmin() {
   return <Outlet />;
 }
 
+function MarketerGuard() {
+  const token = localStorage.getItem('marketer_token');
+  if (!token) return <Navigate to="/marketer/login" replace />;
+  return <Outlet />;
+}
+
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+      <MarketerAuthProvider>
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Routes>
+            {/* ── ADMIN LOGIN ─────────────────────────── */}
+            <Route path="/login" element={<Login />} />
 
-          <Route element={<RequireAdmin />}>
-            <Route element={<Layout />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/incoming-calls" element={<IncomingCalls />} />   {/* ← NEW */}
-              <Route path="/live" element={<LiveDashboard />} />
-              <Route path="/live-tracking" element={<LiveTracking />} />
-              <Route path="/agents" element={<Agents />} />
-              <Route path="/customers" element={<Customers />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/inventory" element={<Inventory />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/withdrawals" element={<Withdrawals />} />
-              <Route path="/promotions" element={<Promotions />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/notifications" element={<Notifications />} />
-              <Route path="/support" element={<Support />} />
-              <Route path="/trash" element={<Trash />} />
-              <Route path="/settings" element={<Settings />} />
+            {/* ── MARKETER LOGIN ──────────────────────── */}
+            <Route path="/marketer/login" element={<MarketerLogin />} />
+
+            {/* ── MARKETER APP ────────────────────────── */}
+            <Route element={<MarketerGuard />}>
+              <Route path="/marketer" element={<MarketerLayout />}>
+                <Route index element={<MarketerDashboard />} />
+                <Route path="registrations" element={<MarketerRegistrations />} />
+                <Route path="commissions" element={<MarketerCommissions />} />
+                <Route path="withdrawals" element={<MarketerWithdrawals />} />
+              </Route>
             </Route>
-          </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+            {/* ── ADMIN APP ───────────────────────────── */}
+            <Route element={<RequireAdmin />}>
+              <Route element={<Layout />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/incoming-calls" element={<IncomingCalls />} />
+                <Route path="/live" element={<LiveDashboard />} />
+                <Route path="/live-tracking" element={<LiveTracking />} />
+                <Route path="/agents" element={<Agents />} />
+                <Route path="/customers" element={<Customers />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/inventory" element={<Inventory />} />
+                <Route path="/orders" element={<Orders />} />
+                <Route path="/withdrawals" element={<Withdrawals />} />
+                <Route path="/promotions" element={<Promotions />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/notifications" element={<Notifications />} />
+                <Route path="/support" element={<Support />} />
+                <Route path="/marketers" element={<Marketers />} />
+                <Route path="/trash" element={<Trash />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
+            </Route>
+
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </MarketerAuthProvider>
     </ThemeProvider>
   );
 }
