@@ -21,8 +21,8 @@ import {
   PhoneInTalk as PhoneIcon,
   Storefront as MarketersIcon,        // ← NEW (re-uses Storefront)
 } from '@mui/icons-material';
-import { Colors } from '../../utils/colors';
-import AdminCallListener from '../../AdminCallListener';
+import { Colors } from '../utils/colors';
+import AdminCallListener from '../AdminCallListener';
 
 const DRAWER_WIDTH = 240;
 
