@@ -1,4 +1,3 @@
-// 📁 gas-mtaani-admin/src/pages/IncomingCalls.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import AgoraRTC from 'agora-rtc-sdk-ng';
 import { io } from 'socket.io-client';
@@ -8,7 +7,7 @@ const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 export default function IncomingCalls() {
   const [incomingCall, setIncomingCall] = useState(null);
   const [activeCall, setActiveCall] = useState(null);
-  const [answeredBy, setAnsweredBy] = useState(null); // 👈 NEW: Track who answered
+  const [answeredBy, setAnsweredBy] = useState(null);
   const [loading, setLoading] = useState(false);
   
   const localAudioTrack = useRef(null);
@@ -19,31 +18,24 @@ export default function IncomingCalls() {
     ringtoneRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     ringtoneRef.current.loop = true;
 
+    // Connect to Socket.io
     socketRef.current = io('https://gas-mtaani-backend.onrender.com');
 
     socketRef.current.on('connect', () => {
       socketRef.current.emit('join_admin_room');
     });
 
-    // 🔔 Incoming Call
     socketRef.current.on('incoming_call', (data) => {
       setIncomingCall(data);
-      setAnsweredBy(null); // Reset the "answered by" state for new calls
+      setAnsweredBy(null);
       ringtoneRef.current.play().catch(e => console.log('Audio blocked', e));
     });
 
-    // 🛑 Call Answered by Another Device
     socketRef.current.on('call_answered_by_other', (data) => {
-      setIncomingCall(null); // Stop ringing
+      setIncomingCall(null);
       ringtoneRef.current.pause(); 
-      
-      // Show the "Answered by" message
       setAnsweredBy(data.adminName);
-
-      // Auto-hide the message after 4 seconds
-      setTimeout(() => {
-        setAnsweredBy(null);
-      }, 4000);
+      setTimeout(() => setAnsweredBy(null), 4000);
     });
 
     return () => {
@@ -65,7 +57,7 @@ export default function IncomingCalls() {
       });
       const data = await res.json();
       
-      if (!data.success) throw new Error(data.error);
+      if (!data.success) throw new Error(data.error || 'Failed to answer');
 
       await client.join(data.app_id, data.channel_name, data.token, null);
       localAudioTrack.current = await AgoraRTC.createMicrophoneAudioTrack();
@@ -75,7 +67,6 @@ export default function IncomingCalls() {
 
     } catch (err) {
       alert(`Error answering: ${err.message}`);
-      setIncomingCall({ callId }); // Restore the ringing state if failed
     } finally {
       setLoading(false);
     }
@@ -108,7 +99,6 @@ export default function IncomingCalls() {
     <div className="p-6 bg-white rounded-lg shadow border border-gray-200">
       <h2 className="text-xl font-bold mb-4">🎧 Support Call Center</h2>
 
-      {/* 1. ACTIVE CALL UI (For the Admin talking) */}
       {activeCall && (
         <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex justify-between items-center">
           <div>
@@ -121,23 +111,18 @@ export default function IncomingCalls() {
         </div>
       )}
 
-      {/* 2. RINGING UI (For devices that need to answer) */}
       {!activeCall && incomingCall && (
         <div className="p-4 border border-yellow-300 bg-yellow-50 rounded-lg animate-pulse flex justify-between items-center">
           <div>
             <p className="font-bold text-lg">{incomingCall.callerName}</p>
             <p className="text-sm text-gray-600">Incoming {incomingCall.callerType} call...</p>
           </div>
-          <button 
-            onClick={() => handleAnswer(incomingCall.callId)}
-            className="bg-green-500 text-white px-6 py-2 rounded font-bold"
-          >
+          <button onClick={() => handleAnswer(incomingCall.callId)} className="bg-green-500 text-white px-6 py-2 rounded font-bold">
             📞 Answer
           </button>
         </div>
       )}
 
-      {/* 3. "ANSWERED BY OTHER" NOTIFICATION */}
       {!activeCall && answeredBy && (
         <div className="p-4 bg-gray-100 border border-gray-300 rounded-lg text-center">
           <p className="text-gray-700 font-medium">
@@ -147,7 +132,6 @@ export default function IncomingCalls() {
         </div>
       )}
 
-      {/* 4. IDLE UI (No calls, no active session) */}
       {!activeCall && !incomingCall && !answeredBy && (
         <div className="p-8 text-center bg-gray-50 rounded-lg border border-dashed border-gray-300">
           <p className="text-gray-500 font-medium">Waiting for incoming calls...</p>
