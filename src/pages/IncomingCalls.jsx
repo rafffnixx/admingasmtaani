@@ -1,197 +1,158 @@
-// 📁 admin-web/src/pages/IncomingCalls.jsx
-import React, { useEffect, useState, useRef } from 'react';
-import {
-  Box, Typography, Paper, Button, Card, CardContent, Chip,
-  Grid, IconButton, CircularProgress, Stack, Alert,
-} from '@mui/material';
-import { PhoneInTalk, CallEnd, Mic, MicOff, Refresh } from '@mui/icons-material';
+// 📁 gas-mtaani-admin/src/pages/IncomingCalls.jsx
+import React, { useState, useEffect, useRef } from 'react';
 import AgoraRTC from 'agora-rtc-sdk-ng';
-import { Colors } from '../utils/colors';
-import { adminAPI } from '../services/api';
+import { io } from 'socket.io-client';
+
+const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
 export default function IncomingCalls() {
-  const [calls, setCalls] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [incomingCall, setIncomingCall] = useState(null);
   const [activeCall, setActiveCall] = useState(null);
-  const [connected, setConnected] = useState(false);
-  const [micMuted, setMicMuted] = useState(false);
-  const [error, setError] = useState(null);
+  const [answeredBy, setAnsweredBy] = useState(null); // 👈 NEW: Track who answered
+  const [loading, setLoading] = useState(false);
+  
+  const localAudioTrack = useRef(null);
+  const ringtoneRef = useRef(null);
+  const socketRef = useRef(null);
 
-  const agoraClientRef = useRef(null);
-  const localAudioTrackRef = useRef(null);
-  const pollRef = useRef(null);
+  useEffect(() => {
+    ringtoneRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+    ringtoneRef.current.loop = true;
 
-  const fetchCalls = async () => {
+    socketRef.current = io('https://gas-mtaani-backend.onrender.com');
+
+    socketRef.current.on('connect', () => {
+      socketRef.current.emit('join_admin_room');
+    });
+
+    // 🔔 Incoming Call
+    socketRef.current.on('incoming_call', (data) => {
+      setIncomingCall(data);
+      setAnsweredBy(null); // Reset the "answered by" state for new calls
+      ringtoneRef.current.play().catch(e => console.log('Audio blocked', e));
+    });
+
+    // 🛑 Call Answered by Another Device
+    socketRef.current.on('call_answered_by_other', (data) => {
+      setIncomingCall(null); // Stop ringing
+      ringtoneRef.current.pause(); 
+      
+      // Show the "Answered by" message
+      setAnsweredBy(data.adminName);
+
+      // Auto-hide the message after 4 seconds
+      setTimeout(() => {
+        setAnsweredBy(null);
+      }, 4000);
+    });
+
+    return () => {
+      socketRef.current.disconnect();
+      if (ringtoneRef.current) ringtoneRef.current.pause();
+    };
+  }, []);
+
+  const handleAnswer = async (callId) => {
+    ringtoneRef.current.pause();
+    setIncomingCall(null);
+    setLoading(true);
+    
     try {
-      const res = await adminAPI.getActiveSupportCalls();
-      setCalls(Array.isArray(res.data) ? res.data : []);
-      setError(null);
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch(`https://gas-mtaani-backend.onrender.com/api/agora/support-calls/${callId}/answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      
+      if (!data.success) throw new Error(data.error);
+
+      await client.join(data.app_id, data.channel_name, data.token, null);
+      localAudioTrack.current = await AgoraRTC.createMicrophoneAudioTrack();
+      await client.publish([localAudioTrack.current]);
+
+      setActiveCall({ callId, channelName: data.channel_name });
+
     } catch (err) {
-      setError('Failed to fetch calls');
+      alert(`Error answering: ${err.message}`);
+      setIncomingCall({ callId }); // Restore the ringing state if failed
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchCalls();
-    pollRef.current = setInterval(fetchCalls, 3000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
-
-  const answerCall = async (call) => {
+  const handleEndCall = async () => {
+    if (!activeCall) return;
+    setLoading(true);
     try {
-      const appId = import.meta.env.VITE_AGORA_APP_ID;
-      if (!appId) { setError('Agora App ID not configured'); return; }
+      if (localAudioTrack.current) {
+        localAudioTrack.current.stop();
+        localAudioTrack.current.close();
+      }
+      await client.leave();
 
-      const tokenRes = await adminAPI.answerSupportCall(call.id);
-      const { token, uid, channel_name } = tokenRes.data || {};
-      if (!token || !channel_name) { setError('Backend did not return token'); return; }
-
-      const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
-      agoraClientRef.current = client;
-      await client.join(appId, channel_name, token, uid);
-
-      const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
-      localAudioTrackRef.current = audioTrack;
-      await client.publish([audioTrack]);
-
-      client.on('user-published', async (user, mediaType) => {
-        if (mediaType === 'audio') {
-          await client.subscribe(user, mediaType);
-          user.audioTrack.play();
-        }
+      const token = localStorage.getItem('admin_token');
+      await fetch(`https://gas-mtaani-backend.onrender.com/api/agora/support-calls/${activeCall.callId}/end`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
       });
-      client.on('user-left', () => endCall());
-
-      setActiveCall({ ...call, channel_name });
-      setConnected(true);
-      setError(null);
-      fetchCalls();
-    } catch (err) {
-      console.error('Answer call error:', err);
-      setError(err?.response?.data?.error || err.message || 'Failed to answer');
-    }
-  };
-
-  const endCall = async () => {
-    try {
-      if (localAudioTrackRef.current) {
-        localAudioTrackRef.current.stop();
-        localAudioTrackRef.current.close();
-        localAudioTrackRef.current = null;
-      }
-      if (agoraClientRef.current) {
-        await agoraClientRef.current.leave();
-        agoraClientRef.current = null;
-      }
-      if (activeCall?.id) {
-        await adminAPI.endSupportCall(activeCall.id).catch(() => {});
-      }
-    } catch (e) { console.warn(e.message); }
-    finally {
       setActiveCall(null);
-      setConnected(false);
-      setMicMuted(false);
-      fetchCalls();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
-
-  const toggleMic = async () => {
-    if (!localAudioTrackRef.current) return;
-    const next = !micMuted;
-    await localAudioTrackRef.current.setEnabled(!next);
-    setMicMuted(next);
-  };
-
-  const ringing = calls.filter((c) => c.status === 'ringing');
-  const answered = calls.filter((c) => c.status === 'answered');
-
-  if (loading) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress sx={{ color: Colors.primary }} /></Box>;
-  }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Box>
-          <Typography variant="h4" fontWeight="bold">Incoming Calls</Typography>
-          <Typography variant="body2" color="text.secondary">{ringing.length} ringing · {answered.length} answered</Typography>
-        </Box>
-        <Button variant="outlined" startIcon={<Refresh />} onClick={fetchCalls}>Refresh</Button>
-      </Box>
+    <div className="p-6 bg-white rounded-lg shadow border border-gray-200">
+      <h2 className="text-xl font-bold mb-4">🎧 Support Call Center</h2>
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
+      {/* 1. ACTIVE CALL UI (For the Admin talking) */}
       {activeCall && (
-        <Paper sx={{ p: 2, mb: 3, bgcolor: '#ECFDF5', border: '2px solid #22C55E' }}>
-          <Stack direction="row" alignItems="center" gap={2}>
-            <Box sx={{ width: 48, height: 48, borderRadius: '50%', bgcolor: '#22C55E', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <PhoneInTalk sx={{ color: '#fff', fontSize: 28 }} />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="h6" fontWeight={700} color="success.main">{connected ? 'Call Connected' : 'Connecting…'}</Typography>
-              <Typography variant="body2" color="text.secondary">{activeCall.caller_name} — {activeCall.caller_phone}</Typography>
-            </Box>
-            <IconButton onClick={toggleMic} sx={{ bgcolor: micMuted ? '#EF4444' : '#22C55E', color: '#fff', '&:hover': { bgcolor: micMuted ? '#DC2626' : '#16A34A' } }}>
-              {micMuted ? <MicOff /> : <Mic />}
-            </IconButton>
-            <Button variant="contained" color="error" startIcon={<CallEnd />} onClick={endCall}>End</Button>
-          </Stack>
-        </Paper>
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg flex justify-between items-center">
+          <div>
+            <p className="text-green-800 font-bold">Call in progress...</p>
+            <p className="text-sm text-green-600">You are connected to the customer.</p>
+          </div>
+          <button onClick={handleEndCall} disabled={loading} className="bg-red-500 text-white px-6 py-2 rounded font-bold">
+            End Call
+          </button>
+        </div>
       )}
 
-      <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5 }}>Ringing Now</Typography>
-      {ringing.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center', color: 'text.secondary' }}>No ringing calls right now.</Paper>
-      ) : (
-        <Grid container spacing={2}>
-          {ringing.map((call) => (
-            <Grid item xs={12} md={6} key={call.id}>
-              <Card sx={{ border: '2px solid #EF4444' }}>
-                <CardContent>
-                  <Stack direction="row" alignItems="center" gap={1.5}>
-                    <Box sx={{ width: 44, height: 44, borderRadius: '50%', bgcolor: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <PhoneInTalk sx={{ color: '#EF4444' }} />
-                    </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <Typography fontWeight={700}>{call.caller_name || 'Caller'}</Typography>
-                      <Typography variant="caption" color="text.secondary">{call.caller_phone || 'N/A'} · {call.caller_type}</Typography>
-                    </Box>
-                    <Chip label="Ringing" color="error" size="small" />
-                  </Stack>
-                  <Stack direction="row" gap={1} mt={2}>
-                    <Button variant="contained" fullWidth startIcon={<PhoneInTalk />} sx={{ bgcolor: '#22C55E', '&:hover': { bgcolor: '#16A34A' } }} onClick={() => answerCall(call)}>Answer</Button>
-                    <Button variant="outlined" color="error" fullWidth startIcon={<CallEnd />} onClick={async () => { await adminAPI.endSupportCall(call.id).catch(() => {}); fetchCalls(); }}>Decline</Button>
-                  </Stack>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+      {/* 2. RINGING UI (For devices that need to answer) */}
+      {!activeCall && incomingCall && (
+        <div className="p-4 border border-yellow-300 bg-yellow-50 rounded-lg animate-pulse flex justify-between items-center">
+          <div>
+            <p className="font-bold text-lg">{incomingCall.callerName}</p>
+            <p className="text-sm text-gray-600">Incoming {incomingCall.callerType} call...</p>
+          </div>
+          <button 
+            onClick={() => handleAnswer(incomingCall.callId)}
+            className="bg-green-500 text-white px-6 py-2 rounded font-bold"
+          >
+            📞 Answer
+          </button>
+        </div>
       )}
 
-      {answered.length > 0 && (
-        <>
-          <Typography variant="subtitle1" fontWeight={700} sx={{ mt: 4, mb: 1.5 }}>Answered</Typography>
-          <Grid container spacing={2}>
-            {answered.map((call) => (
-              <Grid item xs={12} md={6} key={call.id}>
-                <Card>
-                  <CardContent>
-                    <Stack direction="row" alignItems="center" gap={1.5}>
-                      <Typography fontWeight={600}>{call.caller_name || 'Caller'}</Typography>
-                      <Chip label="Answered" color="success" size="small" />
-                      <Box sx={{ flex: 1 }} />
-                      <Button size="small" color="error" startIcon={<CallEnd />} onClick={async () => { await adminAPI.endSupportCall(call.id).catch(() => {}); fetchCalls(); }}>End</Button>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        </>
+      {/* 3. "ANSWERED BY OTHER" NOTIFICATION */}
+      {!activeCall && answeredBy && (
+        <div className="p-4 bg-gray-100 border border-gray-300 rounded-lg text-center">
+          <p className="text-gray-700 font-medium">
+            ☎️ Call answered by <span className="font-bold text-gray-900">{answeredBy}</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-1">Returning to waiting mode...</p>
+        </div>
       )}
-    </Box>
+
+      {/* 4. IDLE UI (No calls, no active session) */}
+      {!activeCall && !incomingCall && !answeredBy && (
+        <div className="p-8 text-center bg-gray-50 rounded-lg border border-dashed border-gray-300">
+          <p className="text-gray-500 font-medium">Waiting for incoming calls...</p>
+        </div>
+      )}
+    </div>
   );
 }
