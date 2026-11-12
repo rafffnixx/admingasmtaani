@@ -24,7 +24,7 @@ import Support from './pages/Support';
 import Notifications from './pages/Notifications';
 import Trash from './pages/Trash';
 import LiveTracking from './pages/LiveTracking';
-import IncomingCalls from './pages/IncomingCalls';
+import AdminCallCenter from './pages/AdminCallCenter'; // 👈 NEW IMPORT
 import Marketers from './pages/Marketers';
 
 // Marketer sub-app
@@ -93,7 +93,10 @@ function App() {
             <Route element={<RequireAdmin />}>
               <Route element={<Layout />}>
                 <Route path="/" element={<Dashboard />} />
-                <Route path="/incoming-calls" element={<IncomingCalls />} />
+                
+                {/* 👇 NEW CALL CENTER ROUTE */}
+                <Route path="/call-center" element={<AdminCallCenter />} />
+                
                 <Route path="/live" element={<LiveDashboard />} />
                 <Route path="/live-tracking" element={<LiveTracking />} />
                 <Route path="/agents" element={<Agents />} />

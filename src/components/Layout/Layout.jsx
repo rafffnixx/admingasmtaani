@@ -22,13 +22,13 @@ import {
   Storefront as MarketersIcon,
 } from '@mui/icons-material';
 import { Colors } from '../../utils/colors';
-import AdminCallListener from '../AdminCallListener';
+// 👈 REMOVED: import AdminCallListener from '../AdminCallListener';
 
 const DRAWER_WIDTH = 240;
 
 const nav = [
   { label: 'Dashboard', path: '/', icon: <DashboardIcon /> },
-  { label: 'Incoming Calls', path: '/incoming-calls', icon: <PhoneIcon /> },
+  { label: 'Call Center', path: '/call-center', icon: <PhoneIcon /> }, // 👈 NEW
   { label: 'Live Tracking', path: '/live-tracking', icon: <MapIcon /> },
   { label: 'Customers', path: '/customers', icon: <PeopleIcon /> },
   { label: 'Agents', path: '/agents', icon: <StoreIcon /> },
@@ -167,7 +167,7 @@ export default function Layout() {
         <Outlet />
       </Box>
 
-      <AdminCallListener />
+      {/* 👈 REMOVED: <AdminCallListener /> */}
     </Box>
   );
 }
