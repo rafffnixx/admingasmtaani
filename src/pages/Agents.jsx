@@ -7,6 +7,7 @@ import {
   Grid, Button, Dialog, DialogTitle, DialogContent, DialogActions, Tabs, Tab, Snackbar,
   Alert, Tooltip, FormControl, InputLabel, Select, MenuItem, Switch, FormControlLabel,
   Divider, Badge, LinearProgress, List, ListItem, ListItemText, ListItemAvatar, ListItemSecondaryAction,
+  CardMedia // 👈 ADDED HERE
 } from '@mui/material';
 import {
   Search, PersonAdd, Visibility, Edit, Delete, Block, CheckCircle, Cancel, Refresh,
