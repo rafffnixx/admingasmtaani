@@ -5,22 +5,20 @@ import {
   Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Chip, IconButton, TextField, InputAdornment, Avatar, CircularProgress, Card, CardContent,
   Grid, Button, Dialog, DialogTitle, DialogContent, DialogActions, Tabs, Tab, Snackbar,
-  Alert, Tooltip, FormControl, InputLabel, Select, MenuItem, Switch, FormControlLabel,
-  Divider, Badge, LinearProgress, List, ListItem, ListItemText, ListItemAvatar, ListItemSecondaryAction,
-  CardMedia // 👈 ADDED: Fixes the crash
+  Alert, Tooltip, Switch, FormControlLabel,
+  Divider, List, ListItem, ListItemText, ListItemAvatar, ListItemSecondaryAction,
+  CardMedia
 } from '@mui/material';
 import {
-  Search, PersonAdd, Visibility, Edit, Delete, Block, CheckCircle, Cancel, Refresh,
+  Search, Visibility, Edit, Delete, Block, CheckCircle, Refresh,
   Download, Phone, Email, Store, Verified, Pending, Close, Check, Star, StarBorder,
-  ShoppingCart, AttachMoney, History, Payment, Chat, SupportAgent, Info, Add,
-  VerifiedUser, TrendingUp, Place, Description
+  History, Payment, Chat, SupportAgent, Info, Add,
 } from '@mui/icons-material';
 import { Colors } from '../utils/colors';
 import { adminAPI, authAPI } from '../services/api';
 
-// ============================================
-// TAB PANEL COMPONENT
-// ============================================
+const API_BASE = 'https://gas-mtaani-backend.onrender.com';
+
 function TabPanel({ children, value, index, ...other }) {
   return (
     <div role="tabpanel" hidden={value !== index} {...other}>
@@ -29,10 +27,15 @@ function TabPanel({ children, value, index, ...other }) {
   );
 }
 
+function authHeaders() {
+  const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+}
+
 export default function Agents() {
-  // ============================================
-  // STATE
-  // ============================================
   const [agents, setAgents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0);
@@ -47,41 +50,39 @@ export default function Agents() {
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Agent profile data
   const [agentOrders, setAgentOrders] = useState([]);
   const [agentPayments, setAgentPayments] = useState([]);
   const [agentChats, setAgentChats] = useState([]);
   const [agentSupportTickets, setAgentSupportTickets] = useState([]);
-  const [agentDocuments, setAgentDocuments] = useState([]); 
+  const [agentDocuments, setAgentDocuments] = useState([]);
+  const [agentLocation, setAgentLocation] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
 
-  // Edit form
   const [editForm, setEditForm] = useState({
-    business_name: '', full_name: '', phone_number: '', email: '', is_approved: false, is_active: true, commission_rate: 10,
+    business_name: '', full_name: '', phone_number: '', email: '',
+    is_approved: false, is_active: true, commission_rate: 10,
   });
 
-  // Create form
   const [createForm, setCreateForm] = useState({
-    phone_number: '', password: '', full_name: '', email: '', business_name: '', business_address: '', user_type: 'agent', is_approved: false, is_active: true, commission_rate: 10,
+    phone_number: '', password: '', full_name: '', email: '',
+    business_name: '', business_address: '', user_type: 'agent',
+    is_approved: false, is_active: true, commission_rate: 10,
   });
 
   const [createErrors, setCreateErrors] = useState({});
 
-  // ============================================
-  // STATS
-  // ============================================
-  const [stats, setStats] = useState({ total: 0, approved: 0, pending: 0, banned: 0, online: 0, total_deliveries: 0, total_revenue: 0 });
+  const [stats, setStats] = useState({
+    total: 0, approved: 0, pending: 0, banned: 0, online: 0,
+    total_deliveries: 0, total_revenue: 0,
+  });
 
-  // ============================================
-  // FETCH FUNCTIONS
-  // ============================================
   useEffect(() => { fetchAgents(); }, []);
 
   const fetchAgents = async () => {
     setLoading(true);
     try {
       const response = await adminAPI.getAgents();
-      let agentsData = Array.isArray(response) ? response : (response?.data || []);
+      const agentsData = Array.isArray(response) ? response : (response?.data || []);
       setAgents(agentsData);
       calculateStats(agentsData);
     } catch (error) {
@@ -105,9 +106,6 @@ export default function Agents() {
     setStats({ total, approved, pending, banned, online, total_deliveries, total_revenue });
   };
 
-  // ============================================
-  // FETCH AGENT PROFILE DATA
-  // ============================================
   const fetchAgentProfileData = async (agentId) => {
     setLoadingProfile(true);
     try {
@@ -117,35 +115,46 @@ export default function Agents() {
       try {
         const ordersResponse = await adminAPI.getAgentOrders?.(agentId);
         setAgentOrders(ordersResponse?.data || ordersResponse || []);
-      } catch (err) { setAgentOrders([]); }
+      } catch { setAgentOrders([]); }
 
       try {
         const paymentsResponse = await adminAPI.getAgentPayments?.(agentId);
         setAgentPayments(paymentsResponse?.data || paymentsResponse || []);
-      } catch (err) { setAgentPayments([]); }
+      } catch { setAgentPayments([]); }
 
       try {
         const chatsResponse = await adminAPI.getAgentChats?.(agentId);
         setAgentChats(chatsResponse?.data || chatsResponse || []);
-      } catch (err) { setAgentChats([]); }
+      } catch { setAgentChats([]); }
 
       try {
         const ticketsResponse = await adminAPI.getAgentTickets?.(agentId);
         setAgentSupportTickets(ticketsResponse?.data || ticketsResponse || []);
-      } catch (err) { setAgentSupportTickets([]); }
+      } catch { setAgentSupportTickets([]); }
 
       try {
-        const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
-        const docRes = await fetch(`https://gas-mtaani-backend.onrender.com/api/agents/${agentId}/documents`, {
-          headers: { Authorization: `Bearer ${token}` }
+        const docRes = await fetch(`${API_BASE}/api/agents/${agentId}/documents`, {
+          headers: authHeaders(),
         });
         const docData = await docRes.json();
         setAgentDocuments(Array.isArray(docData) ? docData : []);
-      } catch (err) {
-        console.error('Failed to load documents', err);
+      } catch {
         setAgentDocuments([]);
       }
 
+      try {
+        const locRes = await fetch(`${API_BASE}/api/agents/${agentId}/location`, {
+          headers: authHeaders(),
+        });
+        if (locRes.ok) {
+          const locData = await locRes.json();
+          setAgentLocation(locData || null);
+        } else {
+          setAgentLocation(null);
+        }
+      } catch {
+        setAgentLocation(null);
+      }
     } catch (error) {
       console.error('Error fetching agent profile:', error);
       showSnackbar('Failed to load agent details', 'error');
@@ -154,13 +163,13 @@ export default function Agents() {
     }
   };
 
-  // ============================================
-  // HANDLER FUNCTIONS
-  // ============================================
-  const showSnackbar = (message, severity = 'success') => { setSnackbar({ open: true, message, severity }); };
+  const showSnackbar = (message, severity = 'success') =>
+    setSnackbar({ open: true, message, severity });
 
   const handleViewAgent = (agent) => {
     setSelectedAgent(agent);
+    setAgentLocation(null);
+    setAgentDocuments([]);
     setProfileTabValue(0);
     setOpenViewDialog(true);
     fetchAgentProfileData(agent.id);
@@ -169,7 +178,13 @@ export default function Agents() {
   const handleEditAgent = (agent) => {
     setSelectedAgent(agent);
     setEditForm({
-      business_name: agent.business_name || '', full_name: agent.full_name || '', phone_number: agent.phone_number || '', email: agent.email || '', is_approved: agent.is_approved || false, is_active: agent.is_active !== false, commission_rate: agent.commission_rate || 10,
+      business_name: agent.business_name || '',
+      full_name: agent.full_name || '',
+      phone_number: agent.phone_number || '',
+      email: agent.email || '',
+      is_approved: agent.is_approved || false,
+      is_active: agent.is_active !== false,
+      commission_rate: agent.commission_rate || 10,
     });
     setOpenEditDialog(true);
   };
@@ -177,38 +192,55 @@ export default function Agents() {
   const handleDeleteAgent = (agent) => { setSelectedAgent(agent); setOpenDeleteDialog(true); };
 
   const handleApprove = async (id) => {
-    try { await adminAPI.approveAgent(id); showSnackbar('Agent approved!'); fetchAgents(); } catch (error) { showSnackbar('Failed to approve', 'error'); }
+    try { await adminAPI.approveAgent(id); showSnackbar('Agent approved!'); fetchAgents(); }
+    catch { showSnackbar('Failed to approve', 'error'); }
   };
 
   const handleReject = async (id) => {
     if (!window.confirm('Reject this agent?')) return;
-    try { await adminAPI.rejectAgent(id); showSnackbar('Agent rejected'); fetchAgents(); } catch (error) { showSnackbar('Failed to reject', 'error'); }
+    try { await adminAPI.rejectAgent(id); showSnackbar('Agent rejected'); fetchAgents(); }
+    catch { showSnackbar('Failed to reject', 'error'); }
   };
 
   const handleBan = async (id) => {
     if (!window.confirm('Ban this agent?')) return;
-    try { await adminAPI.banAgent(id); showSnackbar('Agent banned'); fetchAgents(); } catch (error) { showSnackbar('Failed to ban', 'error'); }
+    try { await adminAPI.banAgent(id); showSnackbar('Agent banned'); fetchAgents(); }
+    catch { showSnackbar('Failed to ban', 'error'); }
   };
 
   const handleUnban = async (id) => {
-    try { await adminAPI.unbanAgent(id); showSnackbar('Agent unbanned'); fetchAgents(); } catch (error) { showSnackbar('Failed to unban', 'error'); }
+    try { await adminAPI.unbanAgent(id); showSnackbar('Agent unbanned'); fetchAgents(); }
+    catch { showSnackbar('Failed to unban', 'error'); }
   };
 
   const handleUpdateAgent = async () => {
     setSubmitting(true);
-    try { await adminAPI.updateAgent?.(selectedAgent.id, editForm); showSnackbar('Agent updated!'); setOpenEditDialog(false); await fetchAgents(); } catch (error) { showSnackbar('Failed to update', 'error'); } finally { setSubmitting(false); }
+    try {
+      await adminAPI.updateAgent?.(selectedAgent.id, editForm);
+      showSnackbar('Agent updated!');
+      setOpenEditDialog(false);
+      await fetchAgents();
+    } catch { showSnackbar('Failed to update', 'error'); }
+    finally { setSubmitting(false); }
   };
 
   const handleDeleteConfirm = async () => {
     setSubmitting(true);
-    try { await adminAPI.deleteAgent?.(selectedAgent.id); showSnackbar('Agent deleted!'); setOpenDeleteDialog(false); await fetchAgents(); } catch (error) { showSnackbar('Failed to delete', 'error'); } finally { setSubmitting(false); }
+    try {
+      await adminAPI.deleteAgent?.(selectedAgent.id);
+      showSnackbar('Agent deleted!');
+      setOpenDeleteDialog(false);
+      await fetchAgents();
+    } catch { showSnackbar('Failed to delete', 'error'); }
+    finally { setSubmitting(false); }
   };
 
-  // ============================================
-  // CREATE AGENT FUNCTIONS
-  // ============================================
   const handleOpenCreateDialog = () => {
-    setCreateForm({ phone_number: '', password: '', full_name: '', email: '', business_name: '', business_address: '', user_type: 'agent', is_approved: false, is_active: true, commission_rate: 10 });
+    setCreateForm({
+      phone_number: '', password: '', full_name: '', email: '',
+      business_name: '', business_address: '', user_type: 'agent',
+      is_approved: false, is_active: true, commission_rate: 10,
+    });
     setCreateErrors({});
     setOpenCreateDialog(true);
   };
@@ -227,80 +259,94 @@ export default function Agents() {
   const handleCreateAgent = async () => {
     const errors = validateCreateForm();
     if (Object.keys(errors).length > 0) { setCreateErrors(errors); return; }
-
     setSubmitting(true);
     try {
       const response = await authAPI.register({
-        phone_number: createForm.phone_number, password: createForm.password, full_name: createForm.full_name, email: createForm.email || null, user_type: 'agent', is_verified: true, is_active: createForm.is_active,
+        phone_number: createForm.phone_number,
+        password: createForm.password,
+        full_name: createForm.full_name,
+        email: createForm.email || null,
+        user_type: 'agent',
+        is_verified: true,
+        is_active: createForm.is_active,
       });
       if (response.data?.success) {
-        showSnackbar(`Agent created!`, 'success'); setOpenCreateDialog(false); await fetchAgents();
+        showSnackbar('Agent created!', 'success');
+        setOpenCreateDialog(false);
+        await fetchAgents();
       }
-    } catch (error) { showSnackbar(error.response?.data?.message || 'Failed to create agent', 'error'); } finally { setSubmitting(false); }
+    } catch (error) {
+      showSnackbar(error.response?.data?.message || 'Failed to create agent', 'error');
+    } finally { setSubmitting(false); }
   };
 
-  // ============================================
-  // DOCUMENT & LOCATION VERIFICATION
-  // ============================================
   const handleDocumentApproval = async (docId, isApproved) => {
     try {
-      const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
-      await fetch(`https://gas-mtaani-backend.onrender.com/api/agents/${selectedAgent.id}/documents/${docId}/approve`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ is_approved: isApproved })
-      });
+      const res = await fetch(
+        `${API_BASE}/api/agents/${selectedAgent.id}/documents/${docId}/approve`,
+        {
+          method: 'PUT',
+          headers: authHeaders(),
+          body: JSON.stringify({ is_approved: isApproved }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showSnackbar(err.error || 'Failed to update document', 'error');
+        return;
+      }
       showSnackbar(isApproved ? 'Document approved' : 'Document rejected', 'success');
-      fetchAgentProfileData(selectedAgent.id);
-      fetchAgents();
-    } catch (err) {
+      await fetchAgentProfileData(selectedAgent.id);
+      await fetchAgents();
+    } catch {
       showSnackbar('Failed to update document', 'error');
     }
   };
 
   const handleLocationVerification = async (isVerified) => {
     try {
-      const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
-      const res = await fetch(`https://gas-mtaani-backend.onrender.com/api/agents/${selectedAgent.id}/verify-location`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ is_verified: isVerified })
-      });
-      if (res.ok) {
-        showSnackbar(isVerified ? 'Location approved' : 'Location rejected', 'success');
-        fetchAgentProfileData(selectedAgent.id);
-        fetchAgents();
+      const res = await fetch(
+        `${API_BASE}/api/agents/${selectedAgent.id}/verify-location`,
+        {
+          method: 'PUT',
+          headers: authHeaders(),
+          body: JSON.stringify({ is_verified: isVerified }),
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        showSnackbar(err.error || 'Failed to verify location', 'error');
+        return;
       }
-    } catch (err) {
+      showSnackbar(isVerified ? 'Location approved' : 'Location rejected', 'success');
+      await fetchAgentProfileData(selectedAgent.id);
+      await fetchAgents();
+    } catch {
       showSnackbar('Failed to verify location', 'error');
     }
   };
 
-  // ============================================
-  // STATUS CHIP
-  // ============================================
   const getStatusChip = (agent) => {
     if (!agent) return <Chip label="Unknown" color="default" size="small" />;
-    if (!agent.is_approved && agent.is_active !== false) return <Chip label="Pending" color="warning" size="small" icon={<Pending sx={{ fontSize: 14 }} />} />;
-    if (agent.is_active === false) return <Chip label="Banned" color="error" size="small" icon={<Block sx={{ fontSize: 14 }} />} />;
-    if (agent.is_online) return <Chip label="Online" color="success" size="small" icon={<CheckCircle sx={{ fontSize: 14 }} />} />;
+    if (!agent.is_approved && agent.is_active !== false)
+      return <Chip label="Pending" color="warning" size="small" icon={<Pending sx={{ fontSize: 14 }} />} />;
+    if (agent.is_active === false)
+      return <Chip label="Banned" color="error" size="small" icon={<Block sx={{ fontSize: 14 }} />} />;
+    if (agent.is_online)
+      return <Chip label="Online" color="success" size="small" icon={<CheckCircle sx={{ fontSize: 14 }} />} />;
     return <Chip label="Approved" color="info" size="small" icon={<Verified sx={{ fontSize: 14 }} />} />;
   };
 
-  // ============================================
-  // FILTER FUNCTIONS
-  // ============================================
   const getFilteredAgents = () => {
     let filtered = agents;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(a => a.business_name?.toLowerCase().includes(term) || a.full_name?.toLowerCase().includes(term) || a.phone_number?.includes(term) || a.email?.toLowerCase().includes(term));
+      filtered = filtered.filter(a =>
+        a.business_name?.toLowerCase().includes(term) ||
+        a.full_name?.toLowerCase().includes(term) ||
+        a.phone_number?.includes(term) ||
+        a.email?.toLowerCase().includes(term)
+      );
     }
     if (tabValue === 1) filtered = filtered.filter(a => !a.is_approved && a.is_active !== false);
     else if (tabValue === 2) filtered = filtered.filter(a => a.is_approved && a.is_active !== false);
@@ -310,7 +356,19 @@ export default function Agents() {
 
   const filteredAgents = getFilteredAgents();
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><CircularProgress sx={{ color: Colors.primary }} /></Box>;
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress sx={{ color: Colors.primary }} />
+      </Box>
+    );
+  }
+
+  // Build map src if we have location
+  const hasCoords = agentLocation?.lat != null && agentLocation?.lng != null;
+  const mapSrc = hasCoords
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${agentLocation.lng - 0.005}%2C${agentLocation.lat - 0.005}%2C${agentLocation.lng + 0.005}%2C${agentLocation.lat + 0.005}&layer=mapnik&marker=${agentLocation.lat}%2C${agentLocation.lng}`
+    : null;
 
   return (
     <Box sx={{ pb: 4 }}>
@@ -321,14 +379,16 @@ export default function Agents() {
           <Typography variant="body2" color="text.secondary">Manage all agents on the platform</Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-          <TextField size="small" placeholder="Search agents..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} sx={{ width: 250 }} InputProps={{ startAdornment: (<InputAdornment position="start"><Search sx={{ color: Colors.gray[400] }} /></InputAdornment>) }} />
+          <TextField size="small" placeholder="Search agents..." value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)} sx={{ width: 250 }}
+            InputProps={{ startAdornment: (<InputAdornment position="start"><Search sx={{ color: Colors.gray[400] }} /></InputAdornment>) }} />
           <Button variant="contained" startIcon={<Add />} onClick={handleOpenCreateDialog} sx={{ bgcolor: Colors.primary }}>Create Agent</Button>
           <Button variant="outlined" size="small" startIcon={<Refresh />} onClick={fetchAgents} sx={{ borderColor: Colors.primary, color: Colors.primary }}>Refresh</Button>
           <Button variant="outlined" size="small" startIcon={<Download />} onClick={() => showSnackbar('Export coming soon!', 'info')} sx={{ borderColor: Colors.primary, color: Colors.primary }}>Export</Button>
         </Box>
       </Box>
 
-      {/* STATS CARDS */}
+      {/* STATS */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {[
           { label: 'Total', value: stats.total, color: Colors.primary },
@@ -350,7 +410,8 @@ export default function Agents() {
 
       {/* TABS */}
       <Paper sx={{ mb: 3 }}>
-        <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)} variant="scrollable" scrollButtons="auto" sx={{ borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { minHeight: 48, textTransform: 'none', fontWeight: 500 } }}>
+        <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)} variant="scrollable" scrollButtons="auto"
+          sx={{ borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { minHeight: 48, textTransform: 'none', fontWeight: 500 } }}>
           <Tab label={`All (${stats.total})`} />
           <Tab label={`Pending (${stats.pending})`} icon={<Pending sx={{ fontSize: 16 }} />} iconPosition="start" />
           <Tab label="Approved" />
@@ -358,7 +419,7 @@ export default function Agents() {
         </Tabs>
       </Paper>
 
-      {/* AGENTS TABLE */}
+      {/* TABLE */}
       <TableContainer component={Paper}>
         <Table>
           <TableHead sx={{ bgcolor: Colors.gray[50] }}>
@@ -374,54 +435,55 @@ export default function Agents() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredAgents.length > 0 ? (
-              filteredAgents.map((agent) => (
-                <TableRow key={agent.id} hover sx={{ bgcolor: !agent.is_approved && agent.is_active !== false ? '#FFF8E1' : agent.is_active === false ? '#FFEBEE' : 'inherit' }}>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar sx={{ bgcolor: agent.is_active !== false ? Colors.primary : Colors.gray[400] }}>{agent.business_name?.charAt(0) || 'A'}</Avatar>
-                      <Box>
-                        <Typography variant="body2" fontWeight={500}>{agent.full_name || agent.business_name}</Typography>
-                        {agent.is_verified && <Chip label="Verified" size="small" icon={<Verified sx={{ fontSize: 12 }} />} color="success" sx={{ height: 18, fontSize: '0.6rem' }} />}
-                      </Box>
+            {filteredAgents.length > 0 ? filteredAgents.map((agent) => (
+              <TableRow key={agent.id} hover
+                sx={{ bgcolor: !agent.is_approved && agent.is_active !== false ? '#FFF8E1' : agent.is_active === false ? '#FFEBEE' : 'inherit' }}>
+                <TableCell>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Avatar sx={{ bgcolor: agent.is_active !== false ? Colors.primary : Colors.gray[400] }}>
+                      {agent.business_name?.charAt(0) || 'A'}
+                    </Avatar>
+                    <Box>
+                      <Typography variant="body2" fontWeight={500}>{agent.full_name || agent.business_name}</Typography>
+                      {agent.is_verified && <Chip label="Verified" size="small" icon={<Verified sx={{ fontSize: 12 }} />} color="success" sx={{ height: 18, fontSize: '0.6rem' }} />}
                     </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">{agent.business_name}</Typography>
-                    <Typography variant="caption" color="text.secondary">{agent.business_address || 'No address'}</Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Phone sx={{ fontSize: 14, color: Colors.gray[400] }} />{agent.phone_number}</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Email sx={{ fontSize: 14, color: Colors.gray[400] }} />{agent.email || 'No email'}</Typography>
-                  </TableCell>
-                  <TableCell>{getStatusChip(agent)}</TableCell>
-                  <TableCell align="center"><Chip label={agent.delivery_count || 0} size="small" color={(agent.delivery_count || 0) > 0 ? 'primary' : 'default'} sx={{ minWidth: 30 }} /></TableCell>
-                  <TableCell align="center" sx={{ fontWeight: 500, color: Colors.primary }}>KES {(agent.total_revenue || 0).toLocaleString()}</TableCell>
-                  <TableCell align="center">
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}><Star sx={{ fontSize: 14, color: Colors.warning }} /><Typography variant="body2">{Number(agent.rating || 0).toFixed(1)}</Typography></Box>
-                  </TableCell>
-                  <TableCell align="center">
-                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                      <Tooltip title="View Profile"><IconButton size="small" onClick={() => handleViewAgent(agent)}><Visibility fontSize="small" /></IconButton></Tooltip>
-                      <Tooltip title="Edit"><IconButton size="small" onClick={() => handleEditAgent(agent)}><Edit fontSize="small" /></IconButton></Tooltip>
-                      {!agent.is_approved && agent.is_active !== false && (
-                        <>
-                          <Tooltip title="Approve"><IconButton size="small" color="success" onClick={() => handleApprove(agent.id)}><Check fontSize="small" /></IconButton></Tooltip>
-                          <Tooltip title="Reject"><IconButton size="small" color="error" onClick={() => handleReject(agent.id)}><Close fontSize="small" /></IconButton></Tooltip>
-                        </>
-                      )}
-                      {agent.is_approved && agent.is_active !== false && (
-                        <Tooltip title="Ban"><IconButton size="small" color="error" onClick={() => handleBan(agent.id)}><Block fontSize="small" /></IconButton></Tooltip>
-                      )}
-                      {agent.is_active === false && (
-                        <Tooltip title="Unban"><IconButton size="small" color="success" onClick={() => handleUnban(agent.id)}><Verified fontSize="small" /></IconButton></Tooltip>
-                      )}
-                      <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => handleDeleteAgent(agent)}><Delete fontSize="small" /></IconButton></Tooltip>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
+                  </Box>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2">{agent.business_name}</Typography>
+                  <Typography variant="caption" color="text.secondary">{agent.business_address || 'No address'}</Typography>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Phone sx={{ fontSize: 14, color: Colors.gray[400] }} />{agent.phone_number}</Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}><Email sx={{ fontSize: 14, color: Colors.gray[400] }} />{agent.email || 'No email'}</Typography>
+                </TableCell>
+                <TableCell>{getStatusChip(agent)}</TableCell>
+                <TableCell align="center"><Chip label={agent.delivery_count || 0} size="small" color={(agent.delivery_count || 0) > 0 ? 'primary' : 'default'} sx={{ minWidth: 30 }} /></TableCell>
+                <TableCell align="center" sx={{ fontWeight: 500, color: Colors.primary }}>KES {(agent.total_revenue || 0).toLocaleString()}</TableCell>
+                <TableCell align="center">
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}><Star sx={{ fontSize: 14, color: Colors.warning }} /><Typography variant="body2">{Number(agent.rating || 0).toFixed(1)}</Typography></Box>
+                </TableCell>
+                <TableCell align="center">
+                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
+                    <Tooltip title="View Profile"><IconButton size="small" onClick={() => handleViewAgent(agent)}><Visibility fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Edit"><IconButton size="small" onClick={() => handleEditAgent(agent)}><Edit fontSize="small" /></IconButton></Tooltip>
+                    {!agent.is_approved && agent.is_active !== false && (
+                      <>
+                        <Tooltip title="Approve"><IconButton size="small" color="success" onClick={() => handleApprove(agent.id)}><Check fontSize="small" /></IconButton></Tooltip>
+                        <Tooltip title="Reject"><IconButton size="small" color="error" onClick={() => handleReject(agent.id)}><Close fontSize="small" /></IconButton></Tooltip>
+                      </>
+                    )}
+                    {agent.is_approved && agent.is_active !== false && (
+                      <Tooltip title="Ban"><IconButton size="small" color="error" onClick={() => handleBan(agent.id)}><Block fontSize="small" /></IconButton></Tooltip>
+                    )}
+                    {agent.is_active === false && (
+                      <Tooltip title="Unban"><IconButton size="small" color="success" onClick={() => handleUnban(agent.id)}><Verified fontSize="small" /></IconButton></Tooltip>
+                    )}
+                    <Tooltip title="Delete"><IconButton size="small" color="error" onClick={() => handleDeleteAgent(agent)}><Delete fontSize="small" /></IconButton></Tooltip>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            )) : (
               <TableRow><TableCell colSpan={8} align="center" sx={{ py: 4 }}><Typography variant="body2" color="text.secondary">No agents found</Typography></TableCell></TableRow>
             )}
           </TableBody>
@@ -429,7 +491,7 @@ export default function Agents() {
       </TableContainer>
 
       {/* ============================================ */}
-      {/* AGENT PROFILE DIALOG */}
+      {/* VIEW PROFILE DIALOG */}
       {/* ============================================ */}
       <Dialog open={openViewDialog} onClose={() => setOpenViewDialog(false)} maxWidth="lg" fullWidth>
         <DialogTitle sx={{ bgcolor: Colors.primaryBg, borderBottom: '1px solid #e0e0e0' }}>
@@ -474,8 +536,7 @@ export default function Agents() {
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress /></Box>
               ) : (
                 <Grid container spacing={3}>
-                  
-                  {/* LEFT COLUMN: BUSINESS INFO */}
+                  {/* LEFT */}
                   <Grid item xs={12} md={6}>
                     <Paper sx={{ p: 3, bgcolor: Colors.gray[50], mb: 3 }}>
                       <Typography variant="h6" sx={{ mb: 2, color: Colors.primary }}>Business Information</Typography>
@@ -485,31 +546,29 @@ export default function Agents() {
                         <Grid item xs={12}><Typography variant="subtitle2" color="text.secondary">Full Name</Typography><Typography variant="body1">{selectedAgent?.full_name}</Typography></Grid>
                         <Grid item xs={12}><Typography variant="subtitle2" color="text.secondary">Phone</Typography><Typography variant="body1">{selectedAgent?.phone_number}</Typography></Grid>
                         <Grid item xs={12}><Typography variant="subtitle2" color="text.secondary">Email</Typography><Typography variant="body1">{selectedAgent?.email || 'N/A'}</Typography></Grid>
-                        <Grid item xs={12}>
-                          <Typography variant="subtitle2" color="text.secondary">Address</Typography>
-                          <Typography variant="body1">
-                            {selectedAgent?.ward ? `${selectedAgent.ward}, ` : ''}
-                            {selectedAgent?.sub_county ? `${selectedAgent.sub_county}, ` : ''}
-                            {selectedAgent?.county || selectedAgent?.business_address || 'N/A'}
-                          </Typography>
-                        </Grid>
                         <Grid item xs={12}><Typography variant="subtitle2" color="text.secondary">Commission Rate</Typography><Typography variant="body1">{selectedAgent?.commission_rate || 10}%</Typography></Grid>
                       </Grid>
                     </Paper>
 
-                    {/* 👈 LOCATION VERIFICATION */}
+                    {/* LOCATION VERIFICATION */}
                     <Paper sx={{ p: 3, bgcolor: Colors.gray[50] }}>
                       <Typography variant="h6" sx={{ mb: 2, color: Colors.primary }}>Location Verification</Typography>
                       <Divider sx={{ mb: 2 }} />
-                      
+
                       <Typography variant="body2" sx={{ mb: 2 }}>
-                        {selectedAgent?.ward ? `${selectedAgent.ward}, ` : ''}
-                        {selectedAgent?.sub_county ? `${selectedAgent.sub_county}, ` : ''}
-                        {selectedAgent?.county || 'No location set'}
+                        {agentLocation?.ward ? `${agentLocation.ward}, ` : ''}
+                        {agentLocation?.sub_county ? `${agentLocation.sub_county}, ` : ''}
+                        {agentLocation?.county || 'No location set'}
                       </Typography>
 
-                      {selectedAgent?.current_latitude && selectedAgent?.current_longitude && (
-                        <Box sx={{ mb: 2, height: 150, borderRadius: 2, overflow: 'hidden' }}>
+                      {agentLocation?.address_line && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                          {agentLocation.address_line}
+                        </Typography>
+                      )}
+
+                      {hasCoords && (
+                        <Box sx={{ mb: 2, height: 180, borderRadius: 2, overflow: 'hidden' }}>
                           <iframe
                             width="100%"
                             height="100%"
@@ -517,39 +576,36 @@ export default function Agents() {
                             scrolling="no"
                             marginHeight="0"
                             marginWidth="0"
-                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${selectedAgent.current_longitude - 0.005}%2C${selectedAgent.current_latitude - 0.005}%2C${selectedAgent.current_longitude + 0.005}%2C${selectedAgent.current_latitude + 0.005}&layer=mapnik&marker=${selectedAgent.current_latitude}%2C${selectedAgent.current_longitude}`}
+                            src={mapSrc}
                             style={{ border: '1px solid #ccc' }}
-                          ></iframe>
+                            title="Agent location"
+                          />
                         </Box>
+                      )}
+
+                      {!hasCoords && (
+                        <Alert severity="info" sx={{ mb: 2 }}>Agent hasn't set their location yet.</Alert>
                       )}
 
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                         <Typography variant="subtitle2" color="text.secondary">Status:</Typography>
-                        <Chip 
-                          label={selectedAgent?.is_location_verified ? 'VERIFIED' : 'PENDING VERIFICATION'} 
-                          size="small" 
-                          color={selectedAgent?.is_location_verified ? 'success' : 'warning'} 
+                        <Chip
+                          label={agentLocation?.is_location_verified ? 'VERIFIED' : 'PENDING VERIFICATION'}
+                          size="small"
+                          color={agentLocation?.is_location_verified ? 'success' : 'warning'}
                         />
                       </Box>
 
                       <Box sx={{ display: 'flex', gap: 1 }}>
-                        {!selectedAgent?.is_location_verified && (
-                          <Button 
-                            size="small" 
-                            variant="contained" 
-                            color="success" 
-                            onClick={() => handleLocationVerification(true)}
-                          >
+                        {!agentLocation?.is_location_verified && hasCoords && (
+                          <Button size="small" variant="contained" color="success"
+                            onClick={() => handleLocationVerification(true)}>
                             Approve Location
                           </Button>
                         )}
-                        {selectedAgent?.is_location_verified && (
-                          <Button 
-                            size="small" 
-                            variant="outlined" 
-                            color="error" 
-                            onClick={() => handleLocationVerification(false)}
-                          >
+                        {agentLocation?.is_location_verified && (
+                          <Button size="small" variant="outlined" color="error"
+                            onClick={() => handleLocationVerification(false)}>
                             Revoke Approval
                           </Button>
                         )}
@@ -557,7 +613,7 @@ export default function Agents() {
                     </Paper>
                   </Grid>
 
-                  {/* RIGHT COLUMN: PERFORMANCE & DOCUMENTS */}
+                  {/* RIGHT */}
                   <Grid item xs={12} md={6}>
                     <Paper sx={{ p: 3, bgcolor: Colors.gray[50], mb: 3 }}>
                       <Typography variant="h6" sx={{ mb: 2, color: Colors.primary }}>Performance Stats</Typography>
@@ -568,7 +624,11 @@ export default function Agents() {
                         <Grid item xs={12}>
                           <Typography variant="subtitle2" color="text.secondary">Rating</Typography>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            {[...Array(5)].map((_, i) => (i < Math.floor(Number(selectedAgent?.rating || 0)) ? <Star key={i} sx={{ color: Colors.warning }} /> : <StarBorder key={i} sx={{ color: Colors.gray[300] }} />))}
+                            {[...Array(5)].map((_, i) => (
+                              i < Math.floor(Number(selectedAgent?.rating || 0))
+                                ? <Star key={i} sx={{ color: Colors.warning }} />
+                                : <StarBorder key={i} sx={{ color: Colors.gray[300] }} />
+                            ))}
                             <Typography variant="body2">({Number(selectedAgent?.rating || 0).toFixed(1)})</Typography>
                           </Box>
                         </Grid>
@@ -576,11 +636,10 @@ export default function Agents() {
                       </Grid>
                     </Paper>
 
-                    {/* 👈 DOCUMENTS VIEWER */}
                     <Paper sx={{ p: 3, bgcolor: Colors.gray[50] }}>
                       <Typography variant="h6" sx={{ mb: 2, color: Colors.primary }}>Verification Documents</Typography>
                       <Divider sx={{ mb: 2 }} />
-                      
+
                       {agentDocuments.length === 0 ? (
                         <Typography color="text.secondary" variant="body2">No documents uploaded yet.</Typography>
                       ) : (
@@ -601,6 +660,11 @@ export default function Agents() {
                                     <Chip label={doc.document_type.replace(/_/g, ' ').toUpperCase()} size="small" color="primary" variant="outlined" />
                                     <Chip label={doc.is_approved ? 'APPROVED' : 'PENDING'} size="small" color={doc.is_approved ? 'success' : 'warning'} />
                                   </Box>
+                                  {doc.rejection_reason && (
+                                    <Typography variant="caption" color="error" sx={{ display: 'block', mb: 1 }}>
+                                      {doc.rejection_reason}
+                                    </Typography>
+                                  )}
                                   <Box sx={{ display: 'flex', gap: 1 }}>
                                     {!doc.is_approved && (
                                       <Button size="small" variant="contained" color="success" onClick={() => handleDocumentApproval(doc.id, true)}>
@@ -736,9 +800,7 @@ export default function Agents() {
         </DialogActions>
       </Dialog>
 
-      {/* ============================================ */}
-      {/* CREATE AGENT DIALOG */}
-      {/* ============================================ */}
+      {/* CREATE DIALOG */}
       <Dialog open={openCreateDialog} onClose={() => setOpenCreateDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -769,9 +831,7 @@ export default function Agents() {
         </DialogActions>
       </Dialog>
 
-      {/* ============================================ */}
-      {/* EDIT AGENT DIALOG */}
-      {/* ============================================ */}
+      {/* EDIT DIALOG */}
       <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -795,7 +855,7 @@ export default function Agents() {
         </DialogActions>
       </Dialog>
 
-      {/* DELETE CONFIRMATION DIALOG */}
+      {/* DELETE DIALOG */}
       <Dialog open={openDeleteDialog} onClose={() => setOpenDeleteDialog(false)}>
         <DialogTitle>Delete Agent</DialogTitle>
         <DialogContent>
@@ -808,7 +868,6 @@ export default function Agents() {
         </DialogActions>
       </Dialog>
 
-      {/* SNACKBAR */}
       <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
         <Alert severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
       </Snackbar>
