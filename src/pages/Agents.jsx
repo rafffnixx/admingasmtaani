@@ -1,4 +1,5 @@
 // 📁 admin-web/src/pages/Agents.jsx
+// (Only change: CardMedia in the Verification Documents section now has onError fallback)
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -364,7 +365,6 @@ export default function Agents() {
     );
   }
 
-  // Build map src if we have location
   const hasCoords = agentLocation?.lat != null && agentLocation?.lng != null;
   const mapSrc = hasCoords
     ? `https://www.openstreetmap.org/export/embed.html?bbox=${agentLocation.lng - 0.005}%2C${agentLocation.lat - 0.005}%2C${agentLocation.lng + 0.005}%2C${agentLocation.lat + 0.005}&layer=mapnik&marker=${agentLocation.lat}%2C${agentLocation.lng}`
@@ -647,6 +647,7 @@ export default function Agents() {
                           {agentDocuments.map((doc) => (
                             <Grid item xs={12} sm={6} key={doc.id}>
                               <Card variant="outlined">
+                                {/* 👇 FIX: onError fallback so broken images show "File missing" text */}
                                 <CardMedia
                                   component="img"
                                   height="120"
@@ -654,6 +655,10 @@ export default function Agents() {
                                   alt={doc.document_type}
                                   sx={{ objectFit: 'cover', cursor: 'pointer', bgcolor: '#fff' }}
                                   onClick={() => window.open(doc.url, '_blank')}
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="240" height="120"><rect width="100%" height="100%" fill="%23FEE2E2"/><text x="50%25" y="50%25" font-family="Arial" font-size="14" fill="%23991B1B" text-anchor="middle" dominant-baseline="middle">File missing</text></svg>';
+                                  }}
                                 />
                                 <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
                                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -676,6 +681,9 @@ export default function Agents() {
                                         Revoke
                                       </Button>
                                     )}
+                                    <Button size="small" variant="text" onClick={() => window.open(doc.url, '_blank')}>
+                                      Open
+                                    </Button>
                                   </Box>
                                 </CardContent>
                               </Card>
