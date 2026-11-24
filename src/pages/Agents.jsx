@@ -7,7 +7,7 @@ import {
   Grid, Button, Dialog, DialogTitle, DialogContent, DialogActions, Tabs, Tab, Snackbar,
   Alert, Tooltip, FormControl, InputLabel, Select, MenuItem, Switch, FormControlLabel,
   Divider, Badge, LinearProgress, List, ListItem, ListItemText, ListItemAvatar, ListItemSecondaryAction,
-  CardMedia // 👈 ADDED HERE
+  CardMedia // 👈 ADDED: Fixes the crash
 } from '@mui/material';
 import {
   Search, PersonAdd, Visibility, Edit, Delete, Block, CheckCircle, Cancel, Refresh,
@@ -52,7 +52,7 @@ export default function Agents() {
   const [agentPayments, setAgentPayments] = useState([]);
   const [agentChats, setAgentChats] = useState([]);
   const [agentSupportTickets, setAgentSupportTickets] = useState([]);
-  const [agentDocuments, setAgentDocuments] = useState([]); // 👈 NEW: Store documents
+  const [agentDocuments, setAgentDocuments] = useState([]); 
   const [loadingProfile, setLoadingProfile] = useState(false);
 
   // Edit form
@@ -114,31 +114,26 @@ export default function Agents() {
       const agent = agents.find(a => a.id === agentId);
       if (agent) setSelectedAgent(prev => ({ ...prev, ...agent }));
 
-      // Fetch agent orders
       try {
         const ordersResponse = await adminAPI.getAgentOrders?.(agentId);
         setAgentOrders(ordersResponse?.data || ordersResponse || []);
       } catch (err) { setAgentOrders([]); }
 
-      // Fetch agent payments
       try {
         const paymentsResponse = await adminAPI.getAgentPayments?.(agentId);
         setAgentPayments(paymentsResponse?.data || paymentsResponse || []);
       } catch (err) { setAgentPayments([]); }
 
-      // Fetch agent chats
       try {
         const chatsResponse = await adminAPI.getAgentChats?.(agentId);
         setAgentChats(chatsResponse?.data || chatsResponse || []);
       } catch (err) { setAgentChats([]); }
 
-      // Fetch agent support tickets
       try {
         const ticketsResponse = await adminAPI.getAgentTickets?.(agentId);
         setAgentSupportTickets(ticketsResponse?.data || ticketsResponse || []);
       } catch (err) { setAgentSupportTickets([]); }
 
-      // 👈 FETCH AGENT DOCUMENTS
       try {
         const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
         const docRes = await fetch(`https://gas-mtaani-backend.onrender.com/api/agents/${agentId}/documents`, {
@@ -242,6 +237,49 @@ export default function Agents() {
         showSnackbar(`Agent created!`, 'success'); setOpenCreateDialog(false); await fetchAgents();
       }
     } catch (error) { showSnackbar(error.response?.data?.message || 'Failed to create agent', 'error'); } finally { setSubmitting(false); }
+  };
+
+  // ============================================
+  // DOCUMENT & LOCATION VERIFICATION
+  // ============================================
+  const handleDocumentApproval = async (docId, isApproved) => {
+    try {
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
+      await fetch(`https://gas-mtaani-backend.onrender.com/api/agents/${selectedAgent.id}/documents/${docId}/approve`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ is_approved: isApproved })
+      });
+      showSnackbar(isApproved ? 'Document approved' : 'Document rejected', 'success');
+      fetchAgentProfileData(selectedAgent.id);
+      fetchAgents();
+    } catch (err) {
+      showSnackbar('Failed to update document', 'error');
+    }
+  };
+
+  const handleLocationVerification = async (isVerified) => {
+    try {
+      const token = localStorage.getItem('admin_token') || localStorage.getItem('token');
+      const res = await fetch(`https://gas-mtaani-backend.onrender.com/api/agents/${selectedAgent.id}/verify-location`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        body: JSON.stringify({ is_verified: isVerified })
+      });
+      if (res.ok) {
+        showSnackbar(isVerified ? 'Location approved' : 'Location rejected', 'success');
+        fetchAgentProfileData(selectedAgent.id);
+        fetchAgents();
+      }
+    } catch (err) {
+      showSnackbar('Failed to verify location', 'error');
+    }
   };
 
   // ============================================
@@ -450,7 +488,6 @@ export default function Agents() {
                         <Grid item xs={12}>
                           <Typography variant="subtitle2" color="text.secondary">Address</Typography>
                           <Typography variant="body1">
-                            {/* 👈 SHOWS THE DECODED LOCATION FROM GPS */}
                             {selectedAgent?.ward ? `${selectedAgent.ward}, ` : ''}
                             {selectedAgent?.sub_county ? `${selectedAgent.sub_county}, ` : ''}
                             {selectedAgent?.county || selectedAgent?.business_address || 'N/A'}
@@ -458,6 +495,65 @@ export default function Agents() {
                         </Grid>
                         <Grid item xs={12}><Typography variant="subtitle2" color="text.secondary">Commission Rate</Typography><Typography variant="body1">{selectedAgent?.commission_rate || 10}%</Typography></Grid>
                       </Grid>
+                    </Paper>
+
+                    {/* 👈 LOCATION VERIFICATION */}
+                    <Paper sx={{ p: 3, bgcolor: Colors.gray[50] }}>
+                      <Typography variant="h6" sx={{ mb: 2, color: Colors.primary }}>Location Verification</Typography>
+                      <Divider sx={{ mb: 2 }} />
+                      
+                      <Typography variant="body2" sx={{ mb: 2 }}>
+                        {selectedAgent?.ward ? `${selectedAgent.ward}, ` : ''}
+                        {selectedAgent?.sub_county ? `${selectedAgent.sub_county}, ` : ''}
+                        {selectedAgent?.county || 'No location set'}
+                      </Typography>
+
+                      {selectedAgent?.current_latitude && selectedAgent?.current_longitude && (
+                        <Box sx={{ mb: 2, height: 150, borderRadius: 2, overflow: 'hidden' }}>
+                          <iframe
+                            width="100%"
+                            height="100%"
+                            frameBorder="0"
+                            scrolling="no"
+                            marginHeight="0"
+                            marginWidth="0"
+                            src={`https://www.openstreetmap.org/export/embed.html?bbox=${selectedAgent.current_longitude - 0.005}%2C${selectedAgent.current_latitude - 0.005}%2C${selectedAgent.current_longitude + 0.005}%2C${selectedAgent.current_latitude + 0.005}&layer=mapnik&marker=${selectedAgent.current_latitude}%2C${selectedAgent.current_longitude}`}
+                            style={{ border: '1px solid #ccc' }}
+                          ></iframe>
+                        </Box>
+                      )}
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                        <Typography variant="subtitle2" color="text.secondary">Status:</Typography>
+                        <Chip 
+                          label={selectedAgent?.is_location_verified ? 'VERIFIED' : 'PENDING VERIFICATION'} 
+                          size="small" 
+                          color={selectedAgent?.is_location_verified ? 'success' : 'warning'} 
+                        />
+                      </Box>
+
+                      <Box sx={{ display: 'flex', gap: 1 }}>
+                        {!selectedAgent?.is_location_verified && (
+                          <Button 
+                            size="small" 
+                            variant="contained" 
+                            color="success" 
+                            onClick={() => handleLocationVerification(true)}
+                          >
+                            Approve Location
+                          </Button>
+                        )}
+                        {selectedAgent?.is_location_verified && (
+                          <Button 
+                            size="small" 
+                            variant="outlined" 
+                            color="error" 
+                            onClick={() => handleLocationVerification(false)}
+                          >
+                            Revoke Approval
+                          </Button>
+                        )}
+                      </Box>
                     </Paper>
                   </Grid>
 
@@ -494,17 +590,29 @@ export default function Agents() {
                               <Card variant="outlined">
                                 <CardMedia
                                   component="img"
-                                  height="100"
+                                  height="120"
                                   image={doc.url}
                                   alt={doc.document_type}
                                   sx={{ objectFit: 'cover', cursor: 'pointer', bgcolor: '#fff' }}
                                   onClick={() => window.open(doc.url, '_blank')}
                                 />
-                                <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
-                                  <Chip label={doc.document_type.replace('_', ' ').toUpperCase()} size="small" color="primary" variant="outlined" sx={{ mb: 0.5, fontSize: '0.65rem', height: 20 }} />
-                                  <Typography variant="caption" display="block" color="text.secondary">
-                                    {new Date(doc.uploaded_at).toLocaleDateString()}
-                                  </Typography>
+                                <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                    <Chip label={doc.document_type.replace(/_/g, ' ').toUpperCase()} size="small" color="primary" variant="outlined" />
+                                    <Chip label={doc.is_approved ? 'APPROVED' : 'PENDING'} size="small" color={doc.is_approved ? 'success' : 'warning'} />
+                                  </Box>
+                                  <Box sx={{ display: 'flex', gap: 1 }}>
+                                    {!doc.is_approved && (
+                                      <Button size="small" variant="contained" color="success" onClick={() => handleDocumentApproval(doc.id, true)}>
+                                        Approve
+                                      </Button>
+                                    )}
+                                    {doc.is_approved && (
+                                      <Button size="small" variant="outlined" color="error" onClick={() => handleDocumentApproval(doc.id, false)}>
+                                        Revoke
+                                      </Button>
+                                    )}
+                                  </Box>
                                 </CardContent>
                               </Card>
                             </Grid>
@@ -513,7 +621,6 @@ export default function Agents() {
                       )}
                     </Paper>
                   </Grid>
-
                 </Grid>
               )}
             </Box>
